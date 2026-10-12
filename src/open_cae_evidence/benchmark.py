@@ -13,13 +13,15 @@ import shutil
 import subprocess
 import sys
 
-from .model import audit_deck, make_deck, validate
-from .reference import mac, references, shape
+from .model import active_tip, area_weights, audit_deck, make_deck, validate
+from .reference import mac, mass_ratio, references, shape
+from .frd import verify_frd
 
 # Declared acceptance bounds, not fitted to a stored FEM answer.
 TOLERANCES = {"analytical_relative": 0.01, "final_mesh_relative": 0.005,
               "shape_mac_min": 0.99, "direction_energy_min": 0.95,
-              "fixed_displacement_relative": 1e-8, "refinement_noise_floor": 5e-5}
+              "fixed_displacement_relative": 1e-8, "refinement_noise_floor": 5e-5,
+              "tip_coupling_relative": 2e-6}
 
 
 def write_json(path, value):
@@ -84,7 +86,8 @@ def parse_dat(text, expected_nodes):
 
 def evaluate(config, nodes, frequencies, eigenvalues, modes):
     length = config["geometry"]["length"]
-    probes = sorted((n for n, (_, y, z) in nodes.items() if abs(y) < 1e-12 and abs(z) < 1e-12), key=lambda n: nodes[n][0])
+    auxiliary = {max(nodes)} if active_tip(config) else set()
+    probes = sorted((n for n, (_, y, z) in nodes.items() if n not in auxiliary and abs(y) < 1e-12 and abs(z) < 1e-12), key=lambda n: nodes[n][0])
     if len(probes) < 10 or nodes[probes[0]][0] != 0 or not math.isclose(nodes[probes[-1]][0], length):
         raise ValueError("Insufficient centerline samples")
     records = []
@@ -111,6 +114,27 @@ def evaluate(config, nodes, frequencies, eigenvalues, modes):
     return records
 
 
+def verify_modes(config, mesh, nodes, frequencies, eigenvalues, modes):
+    records = evaluate(config, nodes, frequencies, eigenvalues, modes)
+    if active_tip(config):
+        weights = area_weights(nodes, config, mesh)
+        for record, mode in zip(records, modes):
+            peak = max(abs(v) for xyz in mode.values() for v in xyz)
+            residual = max(abs(mode[max(nodes)][a] - sum(w*mode[n][a] for n, w in weights.items())) for a in range(3)) / peak
+            record["tip_coupling_relative_residual"] = residual
+            # DAT prints seven significant digits. Signed sums need rounding allowance.
+            record["checks"]["tip_coupling"] = residual <= TOLERANCES["tip_coupling_relative"]
+            record["passed"] = all(record["checks"].values())
+    return records
+
+
+def check_solver_log(log):
+    versions = re.findall(r"CalculiX Version ([\d.]+)", log)
+    if "*ERROR" in log.upper() or "Job finished" not in log or len(versions) != 1:
+        raise RuntimeError("Solver log has errors, is incomplete or lacks a unique version")
+    return versions[0]
+
+
 def run_mesh(config, mesh, directory, solver):
     directory.mkdir(parents=True, exist_ok=False)
     deck, nodes, audit = make_deck(config, mesh)
@@ -124,20 +148,20 @@ def run_mesh(config, mesh, directory, solver):
     log = (directory / "solver.log").read_text(errors="replace")
     if result.returncode != 0 or "*ERROR" in log.upper() or "Job finished" not in log:
         raise RuntimeError(f"CalculiX failed (exit {result.returncode}); see {directory / 'solver.log'}")
-    versions = re.findall(r"CalculiX Version ([\d.]+)", log)
-    if len(versions) != 1:
-        raise ValueError("Cannot establish solver version")
+    version = check_solver_log(log)
     if not (directory / "beam.frd").is_file() or (directory / "beam.frd").stat().st_size == 0:
         raise ValueError("Missing raw mode-shape FRD output")
     frequencies, eigenvalues, modes = parse_dat((directory / "beam.dat").read_text(), nodes)
-    records = evaluate(config, nodes, frequencies, eigenvalues, modes)
+    records = verify_modes(config, mesh, nodes, frequencies, eigenvalues, modes)
+    frd = verify_frd((directory / "beam.frd").read_text(), deck, nodes, frequencies, eigenvalues, modes,
+                     version, {max(nodes)} if active_tip(config) else set())
     for index, mode in enumerate(modes, 1):
         with (directory / f"mode-{index}.csv").open("w", newline="") as handle:
             writer = csv.writer(handle)
             writer.writerow(["node", "x_m", "y_m", "z_m", "ux", "uy", "uz"])
             for n, xyz in sorted(nodes.items()):
                 writer.writerow([n, *xyz, *mode[n]])
-    value = {"mesh": mesh, "audit": audit, "solver_version": versions[0], "modes": records,
+    value = {"mesh": mesh, "audit": audit, "solver_version": version, "modes": records, "frd": frd,
              "passed": all(r["passed"] for r in records)}
     write_json(directory / "verification.json", value)
     return value
@@ -156,15 +180,19 @@ def convergence(runs):
 
 
 def report(result):
-    lines = ["# Cantilever modal verification", "", f"Status: **{result['status']}**", "",
+    tip = "tip_mass" in result["config"]
+    title = "Cantilever with concentrated tip mass" if tip else "Cantilever modal verification"
+    equation = ("sech(beta)+cos(beta)+mu*beta*(cos(beta)*tanh(beta)-sin(beta))=0."
+                if tip else "cos(beta)*cosh(beta)=-1.")
+    lines = [f"# {title}", "", f"Status: **{result['status']}**", "",
              "This is verification of one linear elastic benchmark, not validation against experiments",
              "or evidence of general replacement suitability for a commercial CAE platform.", "",
              "## Model and assumptions", "", "SI: m, kg, s, Pa. Uniform isotropic steel; small undamped free vibrations.",
              "Solid C3D20R quadratic reduced-integration hexahedra; consistent solver mass matrix.",
-             "Every x=0 face node is fixed in DOFs 1–3; other faces are traction-free.",
+             "Every x=0 face node is fixed in DOFs 1–3; other faces have no prescribed displacement.",
              "The deck is audited independently after serialization, including material, volume, connectivity and clamp.", "",
              "```json", json.dumps(result["config"], indent=2), "```", "",
-             "## Independent checks", "", "Euler–Bernoulli: f = beta²/(2*pi*L²) * sqrt(E*I/(rho*A)); cos(beta)*cosh(beta)=-1.",
+             "## Independent checks", "", "Euler–Bernoulli: f = beta²/(2*pi*L²) * sqrt(E*I/(rho*A)); " + equation,
              "Both transverse planes are considered and sorted. Shape checks use the analytical cantilever",
              "eigenfunction at centerline nodes and sign/scale-invariant sampled MAC.",
              "Plane classification uses the fraction of nodal displacement squared in the expected direction;",
@@ -197,6 +225,34 @@ def report(result):
               "experimental validation, damping, prestress, nonlinear response or industrial qualification.",
               "Positive plausible but falsely labeled units cannot be inferred from numbers alone.",
               "See docs/methodology.md for reference derivation, scope and reproducibility instructions."]
+    if tip:
+        lines += ["", "## Tip inertia and coupling", "",
+                  f"Tip/beam mass ratio mu = {mass_ratio(result['config']):.8g}.",
+                  "A centered auxiliary MASS node remains independent in three translation DOFs.",
+                  "Three MPCs equate its displacement to the exact Q8 area-average of the end face.",
+                  "Signed interpolation weights integrate to one and have zero first moments.",
+                  "They distribute inertia forces by virtual work without tying every face node rigidly.",
+                  "Rotary inertia, eccentricity and attachment stiffness are deliberately neglected.",
+                  "Each mode must satisfy the coupling within 2e-6 of peak displacement (DAT rounding).",
+                  "CalculiX may warn that its internal MASS material has no elastic constants; this",
+                  "inertia-only element is intentionally stiffness-free. All *ERROR messages are fatal.",
+                  "See docs/tip-mass.md for the dynamic tip boundary condition and mass-scaling checks."]
+        lines += ["", "| Mesh | Total mass kg | Coupled face nodes | Maximum MPC residual |",
+                  "|---|---:|---:|---:|"]
+        for run in result["runs"]:
+            if "tip_mass_kg" in run["audit"]:
+                lines.append(f"| {'x'.join(map(str, run['mesh']))} | {run['audit']['total_mass_kg']:.8g} | {run['audit']['coupled_face_nodes']} | {max(m['tip_coupling_relative_residual'] for m in run['modes']):.3e} |")
+        lines += ["", "Required CI integration tests separately exercise tip-only and total-mass scaling,",
+                  "modulus scaling, the zero-mass limit, and equivalent solid-face elimination pivots.",
+                  "Their real inputs, outputs and six-mode ratio JSON files are in evidence/tests/tip-mass-*/.",
+                  "This standalone report does not assert that those separate tests have executed."]
+    lines += ["", "## Semantic FRD verification", "",
+              "For every mesh, ASCII FRD geometry, HEX20 connectivity, solver version, six DISP datasets,",
+              "mode IDs, frequencies, eigenvalues and all signed displacement components are checked",
+              "against the audited deck and DAT. The component comparison uses 1e-5 relative tolerance",
+              "and 1e-12 of peak displacement absolute tolerance for FRD/DAT printed precision.",
+              "MASS elements and their auxiliary nodes are omitted by the FRD exporter; their full",
+              "mode displacements are preserved in DAT/CSV and independently checked by the MPC residual."]
     if result.get("error"):
         lines += ["", "## Execution failure", "", result["error"]]
     return "\n".join(lines) + "\n"
@@ -227,12 +283,17 @@ def replay(directory):
         if actual != deck:
             raise ValueError("Archived deck differs from reproducible input")
         f, lam, modes = parse_dat((path / "beam.dat").read_text(), nodes)
-        runs.append({"modes": evaluate(config, nodes, f, lam, modes)})
+        version = check_solver_log((path / "solver.log").read_text())
+        frd = verify_frd((path / "beam.frd").read_text(), actual, nodes, f, lam, modes,
+                         version, {max(nodes)} if active_tip(config) else set())
+        runs.append({"modes": verify_modes(config, mesh, nodes, f, lam, modes), "frd": frd})
     if original["status"] != "passed" or not all(m["passed"] for run in runs for m in run["modes"]) or not all(c["passed"] for c in convergence(runs)):
         raise ValueError("Archived scientific checks failed")
     if [r["modes"] for r in runs] != [r["modes"] for r in original["runs"]] or convergence(runs) != original["convergence"]:
         raise ValueError("Stored verification does not match recomputed checks")
-    print("Evidence hashes, decks, six modes per mesh, analytical checks and convergence verified")
+    if original.get("schema_version", 1) >= 2 and [r["frd"] for r in runs] != [r["frd"] for r in original["runs"]]:
+        raise ValueError("Stored FRD verification differs from recomputed semantics")
+    print("Evidence hashes, decks, DAT/FRD semantics, six modes per mesh, analytical checks, coupling and convergence verified")
 
 
 def main(argv=None):
@@ -260,7 +321,7 @@ def main(argv=None):
                   "working_tree_dirty": bool(dirty.stdout.strip()), "github_run_id": os.environ.get("GITHUB_RUN_ID"),
                   "github_sha": os.environ.get("GITHUB_SHA"), "threads": 1}
     write_json(output / "provenance.json", provenance)
-    result = {"schema_version": 1, "status": "failed", "config": config, "tolerances": TOLERANCES, "runs": []}
+    result = {"schema_version": 2, "status": "failed", "config": config, "tolerances": TOLERANCES, "runs": []}
     try:
         for mesh in config["meshes"]:
             run = run_mesh(config, mesh, output / ("mesh-" + "x".join(map(str, mesh))), solver)

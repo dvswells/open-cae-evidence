@@ -44,11 +44,21 @@ jobs:
           python -m open_cae_evidence.benchmark --output evidence/benchmark 2>&1 | tee evidence/benchmark.log
       - name: Independently replay archived verification
         run: python -m open_cae_evidence.benchmark --verify-evidence evidence/benchmark
+      - name: Run tip-mass benchmark on three meshes
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m open_cae_evidence.benchmark --config benchmarks/cantilever_tip_mass.json --output evidence/tip-mass 2>&1 | tee evidence/tip-mass.log
+      - name: Independently replay tip-mass DAT and FRD evidence
+        run: python -m open_cae_evidence.benchmark --verify-evidence evidence/tip-mass
       - name: Publish technical report in run summary
         if: always()
         run: |
           if test -f evidence/benchmark/report.md; then
             cat evidence/benchmark/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if test -f evidence/tip-mass/report.md; then
+            cat evidence/tip-mass/report.md >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Preserve evidence even on failure
         if: always()

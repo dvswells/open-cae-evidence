@@ -14,6 +14,15 @@ Euler–Bernoulli frequency and shape comparisons, serialized input audits,
 physical input rejection and real-solver material scaling tests are required.
 See [methodology](docs/methodology.md) for equations, assumptions and tolerances.
 
+## Mission 2: concentrated tip mass
+
+A second benchmark adds a centered 1.17 kg ideal point mass, transferred through
+the exact area-average motion of the tip face with three multipoint equations.
+It retains all Mission 1 gates, adds an independently solved tip-mass characteristic
+equation, verifies mass-scaling and coupling, and checks archived FRD semantics
+against the audited mesh and DAT. See [tip-mass formulation](docs/tip-mass.md).
+The original benchmark remains unchanged and both cases run in CI.
+
 ## Cloud and Android workflow
 
 Development happens through Codex Cloud and GitHub. No local installation or
@@ -41,6 +50,8 @@ python -m pip install .
 python -m unittest discover -s tests -v
 python -m open_cae_evidence.benchmark --output evidence/benchmark
 python -m open_cae_evidence.benchmark --verify-evidence evidence/benchmark
+python -m open_cae_evidence.benchmark --config benchmarks/cantilever_tip_mass.json --output evidence/tip-mass
+python -m open_cae_evidence.benchmark --verify-evidence evidence/tip-mass
 ```
 
 Output directories must be new, so stale results cannot silently validate a run.
@@ -51,7 +62,8 @@ system libraries and hosted runner images can change; their versions are recorde
 ## Scope and license
 
 Only a uniform, slender, isotropic, undamped, unprestressed, linear elastic
-cantilever is covered. No FreeCAD, extra solver or optimizer is included. This is
+cantilever, with or without ideal translational tip inertia, is covered. No
+FreeCAD, extra solver or optimizer is included. This is
 numerical verification, not experimental validation or industrial qualification.
 See [contributor guidelines](CONTRIBUTING.md) and [agent instructions](AGENTS.md).
 

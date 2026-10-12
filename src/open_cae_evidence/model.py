@@ -18,7 +18,8 @@ def validate(config):
     Bounds define this metallic slender-beam benchmark's domain, not universal
     material laws. A plausible number with a false unit label cannot be detected.
     """
-    if set(config) != {"units", "geometry", "material", "boundary", "meshes"}:
+    base_keys = {"units", "geometry", "material", "boundary", "meshes"}
+    if set(config) not in (base_keys, base_keys | {"tip_mass"}):
         raise ValueError("Unexpected or missing configuration keys")
     if config["units"] != UNITS:
         raise ValueError("Explicit SI units are required")
@@ -39,6 +40,21 @@ def validate(config):
     if (config["boundary"] != {"plane": "x=0", "dofs": [1, 2, 3]}
             or any(type(d) is not int for d in config["boundary"]["dofs"])):
         raise ValueError("Clamp x=0 in all three translational DOFs")
+    if "tip_mass" in config:
+        tip = config["tip_mass"]
+        if not isinstance(tip, dict) or set(tip) != {"mass", "unit", "position", "coupling", "rotary_inertia"}:
+            raise ValueError("Complete tip mass specification required")
+        mass = tip["mass"]
+        beam_mass = math.prod(g.values()) * m["density"]
+        if type(mass) not in (int, float) or not math.isfinite(mass) or not 0 <= mass <= 10 * beam_mass:
+            raise ValueError("Tip mass must be finite and in [0,10*beam mass] kg")
+        if tip["unit"] != "kg":
+            raise ValueError("Tip mass is a mass in kg, not density or force")
+        if (tip["position"] != [g["length"], 0, 0]
+                or any(type(v) not in (int, float) for v in tip["position"])):
+            raise ValueError("Tip mass must be centered at [L,0,0]")
+        if tip["coupling"] != "area-average-q8" or tip["rotary_inertia"] != "neglected":
+            raise ValueError("Use area-average-q8 translation coupling with neglected rotary inertia")
     meshes = config["meshes"]
     if not isinstance(meshes, list) or len(meshes) < 3:
         raise ValueError("At least three refinement levels are required")
@@ -53,6 +69,55 @@ def validate(config):
         if previous and any(a <= b for a, b in zip(mesh, previous)):
             raise ValueError("Refine all three directions monotonically")
         previous = mesh
+
+
+def active_tip(config):
+    return config.get("tip_mass", {}).get("mass", 0) > 0
+
+
+def area_weights(nodes, config, mesh):
+    """Exact area integral of end-face Q8 interpolation divided by total area.
+
+    Each face corner integrates to -1/12 and each midside node to 1/3 of
+    its cell area. Signed weights are consistent interpolation integrals;
+    the added mass matrix m*w*w^T remains positive semidefinite.
+    """
+    _, ny, nz = mesh
+    g = config["geometry"]
+    if not active_tip(config):
+        return {}
+    face = {n: xyz for n, xyz in nodes.items() if math.isclose(xyz[0], g["length"], abs_tol=1e-12)
+            and n != max(nodes)}
+    # The auxiliary mass node has the largest ID; mesh face nodes precede it.
+    grid = {(round((y / g["width"] + 0.5) * 2 * ny),
+             round((z / g["height"] + 0.5) * 2 * nz)): n for n, (_, y, z) in face.items()}
+    weights = {n: 0.0 for n in face}
+    for j in range(ny):
+        for k in range(nz):
+            for a, b, factor in ((0, 0, -1/12), (2, 0, -1/12), (2, 2, -1/12), (0, 2, -1/12),
+                                 (1, 0, 1/3), (2, 1, 1/3), (1, 2, 1/3), (0, 1, 1/3)):
+                try:
+                    n = grid[(2 * j + a, 2 * k + b)]
+                except KeyError as exc:
+                    raise ValueError("Incomplete Q8 end face") from exc
+                weights[n] += factor / (ny * nz)
+    return weights
+
+
+def tip_cards(config, nodes, mesh, element_id):
+    reference = max(nodes)
+    weights = area_weights(nodes, config, mesh)
+    # Keep MASS DOFs independent: CalculiX cannot safely eliminate them.
+    dependent = max(weights, key=lambda n: (abs(weights[n]), -n))
+    order = [dependent, *sorted(n for n in weights if n != dependent)]
+    lines = ["*ELEMENT, TYPE=MASS, ELSET=TIPMASS", f"{element_id}, {reference}",
+             "*MASS, ELSET=TIPMASS", f'{config["tip_mass"]["mass"]:.16g}', "*EQUATION"]
+    for axis in (1, 2, 3):
+        terms = [(n, axis, weights[n]) for n in order] + [(reference, axis, -1.0)]
+        lines.append(str(len(terms)))
+        for i in range(0, len(terms), 4):
+            lines.append(", ".join(f"{n}, {d}, {w:.16g}" for n, d, w in terms[i:i + 4]))
+    return lines
 
 
 def make_deck(config, mesh):
@@ -75,6 +140,8 @@ def make_deck(config, mesh):
                     connectivity.append(ids[key])
                 elements.append(connectivity)
     fixed = [n for n, (x, _, _) in nodes.items() if x == 0]
+    if active_tip(config):
+        nodes[len(nodes) + 1] = tuple(config["tip_mass"]["position"])
     lines = ["*HEADING", "Open CAE Evidence; SI m kg s Pa; C3D20R cantilever", "*NODE, NSET=ALL"]
     lines.extend(f"{n}, {x:.16g}, {y:.16g}, {z:.16g}" for n, (x, y, z) in nodes.items())
     lines.append("*ELEMENT, TYPE=C3D20R, ELSET=BEAM")
@@ -87,7 +154,10 @@ def make_deck(config, mesh):
     lines += ["*MATERIAL, NAME=STEEL", "*ELASTIC",
               f'{m["young_modulus"]:.16g}, {m["poisson_ratio"]:.16g}',
               "*DENSITY", f'{m["density"]:.16g}',
-              "*SOLID SECTION, ELSET=BEAM, MATERIAL=STEEL", "*BOUNDARY", "FIXED, 1, 3",
+              "*SOLID SECTION, ELSET=BEAM, MATERIAL=STEEL"]
+    if active_tip(config):
+        lines.extend(tip_cards(config, nodes, mesh, len(elements) + 1))
+    lines += ["*BOUNDARY", "FIXED, 1, 3",
               "*STEP", "*FREQUENCY", "6", "*NODE PRINT, NSET=ALL", "U", "*NODE FILE", "U", "*END STEP"]
     deck = "\n".join(lines) + "\n"
     audit = audit_deck(deck, config, mesh)
@@ -115,6 +185,8 @@ def audit_deck(deck, config, mesh):
                 "*NSET, NSET=FIXED", "*MATERIAL, NAME=STEEL", "*ELASTIC", "*DENSITY",
                 "*SOLID SECTION, ELSET=BEAM, MATERIAL=STEEL", "*BOUNDARY", "*STEP",
                 "*FREQUENCY", "*NODE PRINT, NSET=ALL", "*NODE FILE", "*END STEP"]
+    if active_tip(config):
+        expected[8:8] = ["*ELEMENT, TYPE=MASS, ELSET=TIPMASS", "*MASS, ELSET=TIPMASS", "*EQUATION"]
     if [s[0] for s in sections] != expected:
         raise ValueError("Solver deck keyword contract violated")
     data = {key: rows for key, rows in sections}
@@ -171,7 +243,52 @@ def audit_deck(deck, config, mesh):
                 raise ValueError("Incorrect C3D20R connectivity/midside coordinates")
         used.update(conn)
         volume += math.prod(lengths)
-    if used != set(nodes) or not math.isclose(volume, math.prod(g.values()), rel_tol=1e-10):
+    auxiliary = {max(nodes)} if active_tip(config) else set()
+    if used != set(nodes) - auxiliary or not math.isclose(volume, math.prod(g.values()), rel_tol=1e-10):
         raise ValueError("Mesh volume or node coverage mismatch")
-    return {"nodes": len(nodes), "elements": len(element_ids), "fixed_nodes": len(fixed),
-            "volume_m3": volume, "mass_kg": volume * m["density"], "passed": True}
+    audit = {"nodes": len(nodes), "elements": len(element_ids), "fixed_nodes": len(fixed),
+             "volume_m3": volume, "mass_kg": volume * m["density"], "passed": True}
+    if active_tip(config):
+        reference = max(nodes)
+        if nodes[reference] != tuple(config["tip_mass"]["position"]):
+            raise ValueError("Mass reference node is misplaced")
+        mass_rows = data["*ELEMENT, TYPE=MASS, ELSET=TIPMASS"]
+        if len(mass_rows) != 1 or [int(v) for v in mass_rows[0].split(",")] != [math.prod(mesh) + 1, reference]:
+            raise ValueError("MASS must attach to the independent reference node only")
+        if data["*MASS, ELSET=TIPMASS"] != [f'{config["tip_mass"]["mass"]:.16g}']:
+            raise ValueError("Serialized tip mass differs from kg input")
+        weights = area_weights(nodes, config, mesh)
+        if not math.isclose(sum(weights.values()), 1, abs_tol=1e-12):
+            raise ValueError("Coupling must reproduce uniform translation")
+        for axis in (1, 2):
+            if abs(sum(weights[n] * nodes[n][axis] for n in weights)) > 1e-12:
+                raise ValueError("Coupling must preserve centered rigid rotation")
+        rows = data["*EQUATION"]
+        cursor = 0
+        for axis in (1, 2, 3):
+            if cursor >= len(rows) or int(rows[cursor]) != len(weights) + 1:
+                raise ValueError("Coupling must include every end-face node")
+            count = int(rows[cursor]); cursor += 1
+            tokens = []
+            while len(tokens) < 3 * count and cursor < len(rows):
+                tokens.extend(rows[cursor].split(",")); cursor += 1
+            if len(tokens) != 3 * count:
+                raise ValueError("Malformed coupling equation")
+            terms = [(int(tokens[i]), int(tokens[i+1]), float(tokens[i+2])) for i in range(0, len(tokens), 3)]
+            dependent = terms[0][0]
+            if dependent == reference or dependent not in weights:
+                raise ValueError("A solid face DOF, not the mass DOF, must be dependent")
+            coefficients = {}
+            for n, d, w in terms:
+                if d != axis or n in coefficients or not math.isfinite(w):
+                    raise ValueError("Repeated node or wrong/nonfinite coupling DOF")
+                coefficients[n] = w
+            if set(coefficients) != set(weights) | {reference} or coefficients[reference] != -1:
+                raise ValueError("Invalid coupling membership/reference coefficient")
+            if any(not math.isclose(coefficients[n], w, rel_tol=1e-12, abs_tol=1e-14) for n, w in weights.items()):
+                raise ValueError("Incorrect area-average coupling weights")
+        if cursor != len(rows):
+            raise ValueError("Unexpected extra coupling equations")
+        audit.update(tip_mass_kg=config["tip_mass"]["mass"], total_mass_kg=volume*m["density"]+config["tip_mass"]["mass"],
+                     mass_reference_node=reference, coupled_face_nodes=len(weights), coupling_weight_sum=sum(weights.values()))
+    return audit

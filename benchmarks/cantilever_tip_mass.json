@@ -1,0 +1,8 @@
+{
+  "units": {"length": "m", "mass": "kg", "time": "s", "stress": "Pa", "density": "kg/m^3"},
+  "geometry": {"length": 1.0, "width": 0.015, "height": 0.01},
+  "material": {"young_modulus": 210000000000.0, "poisson_ratio": 0.3, "density": 7800.0},
+  "boundary": {"plane": "x=0", "dofs": [1, 2, 3]},
+  "meshes": [[12, 2, 2], [24, 4, 4], [48, 6, 6]],
+  "tip_mass": {"mass": 1.17, "unit": "kg", "position": [1.0, 0.0, 0.0], "coupling": "area-average-q8", "rotary_inertia": "neglected"}
+}
