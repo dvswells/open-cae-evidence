@@ -28,6 +28,8 @@ jobs:
         run: |
           set -euo pipefail
           export PATH="$RUNNER_TEMP/elmer/bin:$PATH"
+          export ELMER_HOME="$RUNNER_TEMP/elmer"
+          export LD_LIBRARY_PATH="$ELMER_HOME/lib"
           mkdir -p evidence/runtime-proof
           cp "$RUNNER_TEMP/elmer-build/source/fem/tests/HeatUniso/"{case.sif,cross.grd,ELMERSOLVER_STARTINFO} evidence/runtime-proof/
           cd evidence/runtime-proof

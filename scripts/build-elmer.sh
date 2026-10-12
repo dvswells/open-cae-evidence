@@ -23,8 +23,22 @@ cmake -S "$work/source" -B "$work/build" \
   -DWITH_ELMERPOST=OFF -DWITH_ElmerIce=OFF -DWITH_CONTRIB=OFF \
   -DWITH_Mumps=OFF -DWITH_Hypre=OFF -DWITH_LUA=OFF \
   2>&1 | tee "$work/configure.log"
-cmake --build "$work/build" --parallel 2 2>&1 | tee "$work/build.log"
-cmake --install "$work/build" 2>&1 | tee "$work/install.log"
+cmake --build "$work/build" --parallel 2 --target Solver_TGT ElmerGrid HeatSolve FluxSolver ResultOutputSolve 2>&1 | tee "$work/build.log"
+# Install only the required unmodified upstream targets. Upstream's global
+# install includes every optional physics module and cannot install a subset.
+mkdir -p "$prefix/bin" "$prefix/lib" "$prefix/share/elmersolver/lib"
+cp "$work/build/fem/src/ElmerSolver" "$work/build/elmergrid/src/ElmerGrid" "$prefix/bin/"
+cp "$work/build/fem/src/"lib{elmersolver,mpi_stubs}.so "$prefix/lib/"
+cp "$work/build/matc/src/libmatc.so" "$work/build/fhutiter/src/libfhuti.so" "$work/build/mathlibs/src/arpack/libarpack.so" "$prefix/lib/"
+cp "$work/build/fem/src/modules/"{HeatSolve,FluxSolver,ResultOutputSolve}.so "$prefix/share/elmersolver/lib/"
+cp "$work/source/fem/src/"{elements.def,SOLVER.KEYWORDS} "$prefix/share/elmersolver/lib/"
+# Remove build-tree RPATHs; runtime uses explicit ELMER_HOME and LD_LIBRARY_PATH.
+find "$prefix/bin" "$prefix/lib" "$prefix/share/elmersolver/lib" -name '*.so' -o -name ElmerSolver -o -name ElmerGrid | while read -r binary; do
+  printf 'file(RPATH_REMOVE FILE "%s")\n' "$binary" >> "$work/remove-rpath.cmake"
+done
+cmake -P "$work/remove-rpath.cmake" 2>&1 | tee "$work/install.log"
+export LD_LIBRARY_PATH="$prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export ELMER_HOME="$prefix"
 cp "$work/build/CMakeCache.txt" "$work/cmake-cache.txt"
 cp -r "$work/source/license_texts" "$prefix/source-licenses"
 printf '%s\n' "$commit" > "$prefix/source-commit.txt"
