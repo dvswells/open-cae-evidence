@@ -11,6 +11,10 @@ UNITS = {
 }
 
 
+def sourced(config):
+    return config.get("problem_id") == "homogeneous_slab_volumetric_source"
+
+
 def validate(config):
     keys = {
         "spec_version",
@@ -23,15 +27,19 @@ def validate(config):
         "internal_heat_generation",
         "meshes",
     }
+    if sourced(config):
+        keys.add("source_region")
     if (
         set(config) != keys
-        or config["spec_version"] != "1.0"
+        or config["spec_version"] != ("1.1" if sourced(config) else "1.0")
         or config["analysis"] != "steady_heat_conduction"
     ):
         raise ValueError("Unknown or incomplete thermal problem specification")
-    if (
-        config["problem_id"] != "homogeneous_slab_steady_heat"
-        or config["units"] != UNITS
+    if config["problem_id"] not in (
+        "homogeneous_slab_steady_heat",
+        "homogeneous_slab_volumetric_source",
+    ) or config["units"] != (
+        {**UNITS, "volumetric_heat_generation": "W/m^3"} if sourced(config) else UNITS
     ):
         raise ValueError("This slab benchmark requires explicit SI thermal units")
     g, m, b = config["geometry"], config["material"], config["boundary"]
@@ -59,7 +67,15 @@ def validate(config):
         raise ValueError(
             "Assign the hotter temperature to x_min, colder to x_max, in K"
         )
-    if b["other_faces"] != "adiabatic" or config["internal_heat_generation"] != 0:
+    if b["other_faces"] != "adiabatic":
+        raise ValueError("Adiabatic sides are required")
+    if sourced(config):
+        if (
+            config["source_region"] != "all_volume"
+            or not 0 < config["internal_heat_generation"] <= 1e7
+        ):
+            raise ValueError("Source requires positive finite W/m^3 over all volume")
+    elif config["internal_heat_generation"] != 0:
         raise ValueError("Reference requires adiabatic sides and zero heat generation")
     if len(config["meshes"]) < 3:
         raise ValueError("At least three meshes are required for consistency")
@@ -79,6 +95,10 @@ def validate(config):
 
 def analytical(config, x):
     """Closed-form Fourier solution, not FE interpolation or solver-derived data."""
+    if sourced(config):
+        from .source_reference import analytical as source_analytical
+
+        return source_analytical(config, x)
     g, b = config["geometry"], config["boundary"]
     gradient = (b["x_max_temperature"] - b["x_min_temperature"]) / g["length"]
     flux = -config["material"]["conductivity"] * gradient

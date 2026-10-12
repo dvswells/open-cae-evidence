@@ -22,6 +22,7 @@ from .results import (
 from .specification import load_problem
 from .thermal_report import report as thermal_report
 from .verification import derived_quantities, for_problem
+from .thermal_problem import sourced
 
 
 def export_csv(prepared, normalized, directory):
@@ -92,6 +93,10 @@ def run_mesh(config, mesh, directory, solver, adapter=None):
     normalized["verification"] = verifier.verify(problem, normalized)
     normalized["verification"]["checks"]["serialized_input_audit"] = True
     derived_quantities(problem, normalized)
+    if sourced(config):
+        from .source_samples import write as write_samples
+
+        write_samples(directory / "nonnodal-samples.csv", config, normalized)
     export_csv(prepared, normalized, directory)
     write_json(directory / "solver-results.json", normalized)
     value = legacy_run(prepared, normalized)
@@ -106,6 +111,10 @@ def run_benchmark(config, output, executable, adapter=None):
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     write_json(output / "config.json", config)
+    if sourced(config):
+        from .source_reference import definition
+
+        write_json(output / "analytical-reference.json", definition(config))
     identity = provenance(executable, adapter)
     write_json(output / "provenance.json", identity)
     result = {
@@ -132,6 +141,13 @@ def run_benchmark(config, output, executable, adapter=None):
                     flush=True,
                 )
             else:
+                if sourced(config):
+                    m = run["thermal"]
+                    print(
+                        f"Mesh {counts}: T_L2={m['temperature_L2_K_m3_2']}, gradient_H1={m['gradient_H1_K_m1_2']}, cold_reaction_out={m['boundary_reaction_outward_heat_flow_W']['x_max']} W, cold_raw_estimate_out={m['surface_outward_heat_flow_W']['x_max']} W",
+                        flush=True,
+                    )
+                    continue
                 print(
                     f"Mesh {counts}: q={run['thermal']['mean_heat_flux_W_m2']}, Q_out={run['thermal']['surface_outward_heat_flow_W']['x_max']} W",
                     flush=True,
@@ -158,6 +174,10 @@ def run_benchmark(config, output, executable, adapter=None):
     (output / "report.md").write_text(
         (modal_report if problem.analysis == "modal" else thermal_report)(result)
     )
+    if sourced(config) and result["status"] == "passed":
+        from .convergence_plot import write
+
+        write(output, {adapter.name: [r["thermal"] for r in result["runs"]]})
     write_json(output / "manifest.json", manifest(output))
     print(f"Benchmark {result['status']}; evidence: {output}")
     return 0 if result["status"] == "passed" else 1
@@ -203,6 +223,12 @@ def replay(directory, adapter=None):
         normalized["verification"] = verifier.verify(problem, normalized)
         normalized["verification"]["checks"]["serialized_input_audit"] = True
         derived_quantities(problem, normalized)
+        if sourced(problem.parameters):
+            from .source_samples import replay as replay_samples
+
+            replay_samples(
+                path / "nonnodal-samples.csv", problem.parameters, normalized
+            )
         run = legacy_run(prepared, normalized)
         if not run["passed"]:
             raise ValueError("Archived scientific checks failed")
@@ -241,6 +267,21 @@ def replay(directory, adapter=None):
             raise ValueError(
                 "Common contract, tolerances or verification differs from raw evidence"
             )
+    if sourced(problem.parameters):
+        from .convergence_plot import replay as replay_plot
+        from .source_report import report
+
+        replay_plot(directory, {adapter.name: [r["thermal"] for r in runs]})
+        if (directory / "report.md").read_text() != report(original):
+            raise ValueError("Sourced technical report differs from replayed results")
+        from .source_reference import definition
+
+        if json.loads(
+            (directory / "analytical-reference.json").read_text()
+        ) != definition(problem.parameters):
+            raise ValueError(
+                "Analytical reference definition differs from physical specification"
+            )
     print(
         "Evidence hashes, input audits, DAT/FRD semantics, normalized fields, independent checks and mesh study verified"
     )
@@ -262,7 +303,9 @@ def main(argv=None):
         return 0
     config = json.loads(args.config.read_text())
     load_problem(config)
-    solver = shutil.which(args.solver or ("ElmerSolver" if args.adapter == "elmer" else "ccx"))
+    solver = shutil.which(
+        args.solver or ("ElmerSolver" if args.adapter == "elmer" else "ccx")
+    )
     if not solver:
         raise RuntimeError(f"Real {adapter.name} solver executable required")
     return run_benchmark(config, args.output, solver, adapter)

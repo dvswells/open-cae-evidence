@@ -47,7 +47,7 @@ jobs:
           python-version: "3.12.14"
       - name: Install the common framework and expose compiled runtime
         run: |
-          python -m pip install --disable-pip-version-check .
+          python -m pip install --disable-pip-version-check '.[plots]'
           echo "$RUNNER_TEMP/elmer/bin" >> "$GITHUB_PATH"
           python -m pip freeze > evidence/elmer-build/python-packages.txt
       - name: All 48 original regression tests
@@ -68,6 +68,13 @@ jobs:
           python -m open_cae_evidence.benchmark --verify-evidence evidence/benchmark
           python -m open_cae_evidence.benchmark --config benchmarks/cantilever_tip_mass.json --output evidence/tip-mass
           python -m open_cae_evidence.benchmark --verify-evidence evidence/tip-mass
+      - name: Source physics, nonnodal convergence and adversarial tests
+        shell: bash
+        env:
+          CAE_SOURCE_TEST_EVIDENCE: evidence/source-failure-injection
+        run: |
+          set -o pipefail
+          python -m unittest discover -s tests_source -v 2>&1 | tee evidence/source-tests.log
       - name: Same slab, both solvers, unchanged physical verification
         run: |
           python -m open_cae_evidence.benchmark --config benchmarks/slab_steady_heat.json --output evidence/thermal
@@ -76,10 +83,22 @@ jobs:
         run: |
           python -m open_cae_evidence.comparison --calculix evidence/thermal --elmer evidence/elmer-thermal --output evidence/comparison
           python -m open_cae_evidence.comparison --calculix evidence/thermal --elmer evidence/elmer-thermal --output evidence/comparison --replay
+      - name: Real volumetric-source solves on four meshes
+        run: |
+          python -m open_cae_evidence.benchmark --config benchmarks/slab_volumetric_source.json --output evidence/source-calculix
+          python -m open_cae_evidence.benchmark --adapter elmer --config benchmarks/slab_volumetric_source.json --output evidence/source-elmer
+      - name: Source convergence comparison, plots and native replay
+        run: |
+          python -m open_cae_evidence.source_comparison --calculix evidence/source-calculix --elmer evidence/source-elmer --output evidence/source-comparison
+          python -m open_cae_evidence.source_comparison --calculix evidence/source-calculix --elmer evidence/source-elmer --output evidence/source-comparison --replay
+      - name: Adversarial audit of excellent nodal agreement
+        run: |
+          python -m open_cae_evidence.numerical_review --calculix evidence/source-calculix --elmer evidence/source-elmer --failure-root evidence/source-failure-injection --output evidence/numerical-review
+          python -m open_cae_evidence.numerical_review --calculix evidence/source-calculix --elmer evidence/source-elmer --failure-root evidence/source-failure-injection --output evidence/numerical-review --replay
       - name: Publish technical reports
         if: always()
         run: |
-          for folder in benchmark tip-mass thermal elmer-thermal comparison; do
+          for folder in benchmark tip-mass thermal elmer-thermal comparison source-calculix source-elmer source-comparison numerical-review; do
             if test -f "evidence/$folder/report.md"; then
               cat "evidence/$folder/report.md" >> "$GITHUB_STEP_SUMMARY"
             fi

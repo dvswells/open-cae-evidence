@@ -7,7 +7,7 @@ import itertools
 import json
 import math
 
-from ..thermal_problem import validate
+from ..thermal_problem import validate, sourced
 
 CORNERS = (
     (0, 0, 0),
@@ -33,7 +33,7 @@ FACES = (
 def sif(config):
     b = config["boundary"]
     k = config["material"]["conductivity"]
-    return f"""! SI: coordinates m; temperature K; conductivity W/(m*K); flux W/m^2; loads W
+    text = f"""! SI: coordinates m; temperature K; conductivity W/(m*K); flux W/m^2; loads W
 Header
   CHECK KEYWORDS Warn
   Mesh DB "." "."
@@ -112,6 +112,14 @@ Boundary Condition 3
   Heat Flux = Real 0
 End
 """
+    if sourced(config):
+        text = text.replace("  Material = 1\n", "  Material = 1\n  Body Force = 1\n", 1)
+        text = text.replace(
+            "Solver 1\n",
+            f'! Uniform volumetric source W/m^3, not a density-scaled specific source\nBody Force 1\n  Volumetric Heat Source = Real {config["internal_heat_generation"]:.16g}\nEnd\nSolver 1\n',
+            1,
+        )
+    return text
 
 
 def generate(config, counts):
@@ -239,6 +247,16 @@ def audit_sif(text, config):
         ),
         ("boundary condition 3", "heat flux", 0),
     ]
+    if sourced(config):
+        if sections.get("body 1", {}).get("body force") != "1":
+            raise ValueError("Source is not applied over body 1/all cells")
+        numerical.append(
+            (
+                "body force 1",
+                "volumetric heat source",
+                config["internal_heat_generation"],
+            )
+        )
     for section, key, expected_value in numerical:
         raw = sections.get(section, {}).get(key, "")
         try:
@@ -328,7 +346,7 @@ def audit(files, config, counts):
     header = f"{len(nodes)} {len(elements)} {len(faces)}\n2\n808 {len(elements)}\n404 {len(faces)}\n"
     if files["mesh.header"] != header:
         raise ValueError("Native mesh header differs")
-    return {
+    result = {
         "passed": True,
         "nodes": len(nodes),
         "elements": len(elements),
@@ -339,3 +357,19 @@ def audit(files, config, counts):
         "native_boundary_element": 404,
         "units": config["units"],
     }
+    if sourced(config):
+        row = next(
+            line
+            for line in files["slab.sif"].splitlines()
+            if line.strip().startswith("Volumetric Heat Source =")
+        )
+        value = float(row.split("Real ", 1)[1])
+        result["volumetric_source"] = {
+            "unit": "W/m^3",
+            "region": "all_volume",
+            "source_files": ["slab.sif", "mesh.elements", "units.json"],
+            "element_values": [
+                {"element": e, "value": value} for e in sorted(elements)
+            ],
+        }
+    return result

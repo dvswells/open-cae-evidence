@@ -82,3 +82,23 @@ Unknown versions are rejected pending an implemented compatibility/migration pol
 New topologies or analyses need a documented compatible version and tests. Existing
 Mission 1/2 raw files and index fields remain available; legacy replay adds checks
 without silently mutating or manufacturing missing contract files.
+
+Mission 5 retains results schema **1.0.0** and archive index 3. Its separate
+physical input specification 1.1 adds explicit source units and full-volume
+region; 1.0 source-free data remain supported unchanged. Optional quantities
+`raw_temperature_gradient` (K/m), `raw_fourier_heat_flux` (W/m²),
+`recovered_nodal_heat_flux` (W/m²), `native_total_nodal_heat_rate` (W) and
+`boundary_reaction_heat_flow` (W) use existing unit/location/provenance fields.
+Audited actual input source magnitude/element coverage is stored in
+`raw_output_verification.volumetric_source`, not presented as a numerical output.
+
+For the source case `heat_flow` is a raw Q1 boundary-gradient estimate; explicit
+source notes distinguish it from the reaction-based balance. CalculiX
+`nodal_heat_rate` is native RFL minus the consistently integrated actual source
+load, marked postprocessed; native combined RFL is retained separately. Elmer
+Temperature Loads already contain the source-subtracted residual. Consumers
+must not assume `nodal_heat_rate` has identical native origin in every problem.
+Native/recovered flux diagnostics remain separate from the common raw Fourier
+field. Full dimensioned error norms, precision floors, actual sampling semantics
+and nullable observed orders appear in verification metrics. See [derivation
+and semantic compatibility](source-thermal.md).

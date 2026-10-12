@@ -3,6 +3,7 @@
 import math
 
 from . import modal_verification, thermal_verification
+from .thermal_problem import sourced
 from .results import (
     mesh_maps,
     modal_fields,
@@ -66,8 +67,23 @@ class ModalVerifier:
 class ThermalVerifier:
     tolerances = thermal_verification.TOLERANCES
 
+    def __init__(self, source=False):
+        if source:
+            from .source_verification import TOLERANCES
+
+            self.tolerances = TOLERANCES
+
     def verify(self, problem, normalized):
         require_quantities(problem.analysis, normalized)
+        if sourced(problem.parameters):
+            from .source_verification import verify
+
+            result = verify(problem.parameters, normalized)
+            return {
+                "status": "passed" if result["passed"] else "failed",
+                "checks": result["checks"],
+                "metrics": result,
+            }
         nodes, elements = mesh_maps(normalized)
         data = thermal_fields(normalized)
         result = thermal_verification.verify(problem.parameters, nodes, elements, data)
@@ -78,12 +94,16 @@ class ThermalVerifier:
         }
 
     def study(self, runs):
+        if runs and "temperature_L2_K_m3_2" in runs[0].get("thermal", {}):
+            from .source_verification import study
+
+            return study(runs)
         return thermal_verification.mesh_consistency(runs)
 
 
 def for_problem(problem):
     return (
-        ThermalVerifier()
+        ThermalVerifier(sourced(problem.parameters))
         if problem.analysis == "steady_heat_conduction"
         else ModalVerifier()
     )
@@ -93,6 +113,11 @@ def derived_quantities(problem, normalized):
     if problem.analysis != "steady_heat_conduction":
         return
     metrics = normalized["verification"]["metrics"]
+    if sourced(problem.parameters):
+        from .source_quantities import add_quantities
+
+        add_quantities(problem, normalized)
+        return
     normalized["quantities"]["heat_flow"] = quantity(
         "W",
         "boundary",

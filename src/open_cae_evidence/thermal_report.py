@@ -4,6 +4,12 @@ import json
 
 
 def report(result):
+    from .thermal_problem import sourced
+
+    if sourced(result["config"]):
+        from .source_report import report as source_report
+
+        return source_report(result)
     elmer = result.get("solver_name") == "Elmer"
     lines = [
         "# Homogeneous slab: steady 3D heat conduction",

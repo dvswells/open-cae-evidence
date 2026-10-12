@@ -6,6 +6,7 @@ import subprocess
 from ..interfaces import PreparedInput
 from ..results import physical_mesh, quantity
 from . import elmer_input, elmer_output
+from ..thermal_problem import sourced
 
 
 class ElmerAdapter:
@@ -179,7 +180,7 @@ class ElmerAdapter:
                 "Q1 interpolation of native L2-recovered nodal Fourier flux at physical 2x2x2 Gauss points; NOT native integration-point flux. Coordinates m.",
             ),
         }
-        return {
+        normalized = {
             "mesh": physical_mesh(prepared),
             "solver": {
                 "name": self.name,
@@ -206,3 +207,18 @@ class ElmerAdapter:
                 "embedded_native_physical_units",
             ],
         }
+        if sourced(prepared.problem.parameters):
+            audit = self.audit_files(prepared, directory)
+            normalized["raw_output_verification"]["volumetric_source"] = audit[
+                "volumetric_source"
+            ]
+            normalized["raw_output_verification"][
+                "thermal_flux_representation"
+            ] = "global_l2_nodal_projection"
+            normalized["raw_output_verification"][
+                "temperature_print_resolution_K"
+            ] = 1e-5
+            normalized["raw_output_verification"][
+                "recovered_flux_print_resolution_W_m2"
+            ] = 0.001
+        return normalized

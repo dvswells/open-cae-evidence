@@ -78,7 +78,27 @@ def parse_dat(text, nodes, elements):
     return data
 
 
-def verify_frd(text, nodes, elements, data, version):
+def temperature_print_resolution(text):
+    """Quantization step in K from actual native E-format temperature tokens."""
+    import re
+
+    block = text.split("temperatures for set ALL", 1)[1].split(
+        "heat generation for set ALL", 1
+    )[0]
+    tokens = re.findall(r"^\s+\d+\s+([+-]?\d+\.\d+E[+-]\d+)\s*$", block, re.M)
+    if not tokens:
+        raise ValueError("Cannot establish native DAT temperature precision")
+    steps = []
+    for value in tokens:
+        mantissa, exponent = value.split("E")
+        digits = len(mantissa.split(".")[1])
+        if digits != 6:
+            raise ValueError("Unsupported native DAT temperature print format")
+        steps.append(10.0 ** (int(exponent) - digits))
+    return max(steps)
+
+
+def verify_frd(text, nodes, elements, data, version, sourced=False):
     lines = text.splitlines()
     i = 0
     xyz = {}
@@ -206,6 +226,41 @@ def verify_frd(text, nodes, elements, data, version):
             raise ValueError(f"Thermal FRD {field} differs from DAT")
     # FLUX is extrapolated/averaged, not the raw integration-point quantity.
     # CalculiX HEX8 extrapolation gives about 4e-5 relative bias for constant flux.
+    if sourced:
+        from .q1 import SIGNS, gp_samples, gp_vector
+
+        expected = {n: [0.0, 0.0, 0.0] for n in nodes}
+        counts = {n: 0 for n in nodes}
+        for e, conn in elements.items():
+            samples = gp_samples(data, nodes, conn, e)
+            for n, local in zip(conn, SIGNS):
+                q = gp_vector(samples, local)
+                counts[n] += 1
+                for a in range(3):
+                    expected[n][a] += q[a]
+        scale = max(abs(v) for q in data["heat_flux"].values() for v in q)
+        if any(
+            abs(fields["FLUX"][n][a] - expected[n][a] / counts[n]) > 1e-4 * scale
+            for n in nodes
+            for a in range(3)
+        ):
+            raise ValueError(
+                "Sourced FRD extrapolated/averaged flux differs from actual DAT"
+            )
+        return (
+            {
+                "passed": True,
+                "format": "CalculiX ASCII FRD",
+                "solver_version": version,
+                "nodes": len(nodes),
+                "elements": len(elements),
+                "datasets": ["NDTEMP", "FLUX", "RFL"],
+                "nodal_flux_is_extrapolated": True,
+                "nodal_flux_relative_tolerance": 1e-4,
+                "recovery": "arithmetic average of element Gauss extrapolations",
+            },
+            fields["FLUX"],
+        )
     average = [
         sum(q[a] for q in data["heat_flux"].values()) / len(data["heat_flux"])
         for a in range(3)

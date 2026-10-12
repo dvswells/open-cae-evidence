@@ -5,6 +5,8 @@ boundary and a solver/serialization boundary. CalculiX and Elmer are separate
 adapters; Elmer currently implements only the steady slab. Both use the same
 ProblemSpec and unchanged ThermalVerifier, with no duplicated analytical reference.
 No plugin registry, server, UI, workflow engine or LLM dependency is introduced.
+Mission 5 adds the uniform-source slab through the same interfaces; ThermalVerifier
+dispatches by physical problem, not adapter. Source-free verification is unchanged.
 
 ```mermaid
 flowchart LR
@@ -30,6 +32,9 @@ flowchart LR
 | `model.py`, `thermal_input.py` | CalculiX input serializers/auditors | Claim successful output verification |
 | `adapters/modal_dat.py`, `frd.py`, `thermal_output.py` | CalculiX DAT/FRD codecs and cross-file checks | Substitute analytical numbers for missing solver results |
 | `reference.py`, `thermal_problem.analytical` | Independent analytical equations | Read FEM output |
+| `source_reference.py`, `source_verification.py` | Source PDE/reference, volume error norms, source-aware balance and observed orders | Depend on solver file formats |
+| `q1.py`, `source_quantities.py` | Physical Q1 interpolation/gradient, consistent source loads, common derived fields | Substitute reference fields for DOFs |
+| `source_samples.py`, `source_comparison.py`, `convergence_plot.py`, `numerical_review.py` | Replayable point samples, common-field comparison, measured plots and adversarial numerical review | Treat nodal coincidence or conservation alone as correctness |
 | `modal_verification.py`, `thermal_verification.py`, `verification.py` | Check normalized physical quantities, constraints, conservation, mesh studies | Parse solver files or select a solver |
 | `results.py`, packaged JSON Schema | Versioned, unit-bearing interoperability contract | Treat schema validity as physical verification |
 | `evidence.py`, report modules | Persistence, hashes, provenance, reports | Start user-operated services |
@@ -46,7 +51,8 @@ in `coupling.py`; the serialized equations remain the CalculiX adapter's respons
 `ProblemSpec` contains `id`, `analysis`, validated `parameters`, explicit `units`,
 physical `boundary_conditions`, `required_quantities` and `unsupported_capabilities`.
 `load_problem(config)` preserves unversioned Mission 1/2 physical input files;
-the new thermal input explicitly declares `spec_version: "1.0"`.
+the source-free thermal input explicitly declares `spec_version: "1.0"`.
+The separate sourced input uses 1.1 with explicit W/m³ source and region.
 
 `SolverAdapter` is a Python structural protocol:
 
@@ -99,7 +105,7 @@ JSON Schema is validated using pinned, open-source `jsonschema`; physical covera
 units and verdict consistency are checked additionally. This library is not a
 simulation or orchestration framework. All schema resources ship in the Python wheel.
 
-The common archive layout for all four solver/benchmark executions is:
+The common archive layout for all six solver/benchmark executions is:
 
 ```
 config.json
@@ -118,6 +124,12 @@ mesh-<nx>x<ny>x<nz>/
   verification.json
   <mode-N|temperature|heat-flux>.csv
 ```
+
+Sourced archives also contain `analytical-reference.json`, `convergence.svg`,
+`convergence-plot-data.json`, and per-mesh `nonnodal-samples.csv`.
+Their semantic replay recomputes all samples, norms, plots and source-aware
+checks from native DOFs. Plotting is an optional pinned dependency extra needed
+for sourced benchmark generation/replay; no LLM is involved. See [source case](source-thermal.md).
 
 Only new output directories are accepted. Evidence with symlinks, unsafe manifest
 paths, changed/incomplete file sets, unsupported versions or disagreeing metadata

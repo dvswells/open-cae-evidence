@@ -37,6 +37,13 @@
   Preserve native Elmer SIF/mesh/VTU/log/provenance and actual failure-injection
   evidence. Never label Elmer L2 nodal flux recovery as native Gauss output.
   ThermalVerifier, schema 1.0.0 and original tolerances remain unchanged.
+- Mission 5 authorizes the uniform volumetric source case in both adapters.
+  Run all 98 tests, all six solver/benchmark executions, both comparisons and
+  native/derived evidence replay. Use 27-point volume quadrature for nonnodal
+  errors, never nodal or center-only agreement as convergence evidence. Keep
+  raw Fourier, native/recovered flux and reaction flows distinct; preserve
+  source-free gates and contract 1.0.0. Review actual evidence adversarially
+  before opening the PR. See docs/source-thermal.md.
 - Treat modal eigenvectors as sign/scale arbitrary. Match physical directions and
   shapes, not only ascending frequency indices. Check units and the serialized clamp.
 - Keep the tip MASS node independent; transfer its translation through the full

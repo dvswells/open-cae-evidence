@@ -3,6 +3,7 @@
 from .interfaces import ProblemSpec
 from .modal_problem import validate as validate_modal
 from .thermal_problem import validate as validate_thermal
+from .thermal_problem import sourced
 
 
 def load_problem(config):
@@ -35,7 +36,11 @@ def load_problem(config):
             (
                 "transient_heat",
                 "temperature_dependent_conductivity",
-                "internal_heat_generation",
+                *(
+                    ("nonuniform_heat_generation",)
+                    if sourced(config)
+                    else ("internal_heat_generation",)
+                ),
                 "experimental_validation",
             ),
         )

@@ -23,6 +23,13 @@ See [Elmer reproduction and native semantics](docs/elmer.md). Do not require mon
 convergence for a patch-exact linear thermal solution. The source distribution
 includes the JSON Schema; packaging changes must preserve it.
 
+Mission 5 additionally requires all 24 `tests_source` tests, both four-mesh
+native sourced benchmarks, source comparison, numerical adversarial review and
+their replay. Install the pinned `.[plots]` extra. See [source thermal](docs/source-thermal.md)
+for nonnodal quadrature, printing bounds, reaction/source balance and distinct
+raw/native/recovered flux semantics. Preserve all 74 previous tests and their
+acceptance criteria. Conservation alone cannot verify the requested source.
+
 Reference definitions must have equations, units, assumptions and an open source
 or an independently reproducible derivation. Specify tolerances before comparing
 new solver output; changes to acceptance criteria need physical justification.

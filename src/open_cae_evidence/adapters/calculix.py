@@ -12,6 +12,7 @@ from ..coupling import active_tip
 from ..interfaces import PreparedInput
 from ..results import physical_mesh, quantity
 from .modal_dat import parse_dat
+from ..thermal_problem import sourced
 
 
 def check_solver_log(log):
@@ -68,6 +69,12 @@ class CalculiXAdapter:
         )
 
     def execute(self, prepared, directory, executable):
+        if sourced(prepared.problem.parameters):
+            thermal_input.audit_deck(
+                (directory / "slab.inp").read_text(),
+                prepared.problem.parameters,
+                prepared.counts,
+            )
         env = os.environ.copy()
         env.update(OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", CCX_NPROC_RESULTS="1")
         with (directory / "solver.log").open("w") as log:
@@ -153,7 +160,11 @@ class CalculiXAdapter:
                 prepared.elements,
                 data,
                 solver_version,
+                sourced=sourced(prepared.problem.parameters),
             )
+            source = sourced(prepared.problem.parameters)
+            if source:
+                semantics, recovered = semantics
             quantities = {
                 "temperature": quantity(
                     "K",
@@ -200,6 +211,66 @@ class CalculiXAdapter:
                 "native_boundary_surface_flux",
                 "exact_nodal_flux_extrapolation",
             ]
+            if source:
+                from ..q1 import consistent_source_load
+                from ..thermal_input import audit_deck
+
+                actual_audit = audit_deck(
+                    (directory / "slab.inp").read_text(),
+                    prepared.problem.parameters,
+                    prepared.counts,
+                )
+                model_source = actual_audit["volumetric_source"]
+                loads = consistent_source_load(
+                    prepared.nodes, prepared.elements, model_source
+                )
+                quantities["native_total_nodal_heat_rate"] = quantities[
+                    "nodal_heat_rate"
+                ]
+                quantities["native_total_nodal_heat_rate"] = quantity(
+                    "W",
+                    "node",
+                    ["conductive_nodal_heat_rate"],
+                    quantities["native_total_nodal_heat_rate"]["values"],
+                    "solver",
+                    ["slab.dat"],
+                    "Native sourced CalculiX RFL is K*T: combined volumetric loading and Dirichlet reactions, not a separate boundary reaction.",
+                )
+                quantities["nodal_heat_rate"] = quantity(
+                    "W",
+                    "node",
+                    ["heat_input"],
+                    [
+                        {"node": n, "value": v - loads[n]}
+                        for n, v in sorted(data["heat_rate"].items())
+                    ],
+                    "postprocessed_from_solver",
+                    ["slab.dat", "slab.inp"],
+                    "Native RFL equals K*T here and includes volumetric loading. Dirichlet reaction = RFL - consistent integral N_i*qdot dV on audited actual source cells; not an analytical boundary flow.",
+                )
+                quantities["recovered_nodal_heat_flux"] = quantity(
+                    "W/m^2",
+                    "node",
+                    ["x", "y", "z"],
+                    [
+                        {"node": n, "value": list(q)}
+                        for n, q in sorted(recovered.items())
+                    ],
+                    "solver",
+                    ["slab.frd"],
+                    "Native CalculiX arithmetic nodal average of element extrapolated IP flux; not a global L2 projection.",
+                )
+                semantics["volumetric_source"] = model_source
+                semantics["thermal_flux_representation"] = "native_integration_point"
+                semantics["temperature_print_resolution_K"] = (
+                    thermal_output.temperature_print_resolution(
+                        (directory / "slab.dat").read_text()
+                    )
+                )
+                semantics["recovered_flux_print_resolution_W_m2"] = 0.1
+                unsupported.append(
+                    "native_dirichlet_reaction_separate_from_body_source_in_dat"
+                )
         return {
             "mesh": physical_mesh(prepared),
             "solver": {

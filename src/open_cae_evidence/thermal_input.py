@@ -2,7 +2,7 @@
 
 import math
 
-from .thermal_problem import validate
+from .thermal_problem import validate, sourced
 
 CORNERS = (
     (0, 0, 0),
@@ -75,6 +75,13 @@ def make_deck(config, mesh):
         "HFL",
         "*END STEP",
     ]
+    if sourced(config):
+        at = lines.index("*NODE PRINT, NSET=ALL")
+        lines[at:at] = [
+            "*DFLUX",
+            f'SLAB, BF, {config["internal_heat_generation"]:.16g}',
+        ]
+        lines[1] += "; volumetric BF W/m^3"
     deck = "\n".join(lines) + "\n"
     return deck, nodes, elements, audit_deck(deck, config, mesh)
 
@@ -110,6 +117,8 @@ def audit_deck(deck, config, mesh):
         "*EL FILE",
         "*END STEP",
     ]
+    if sourced(config):
+        expected.insert(expected.index("*NODE PRINT, NSET=ALL"), "*DFLUX")
     if [s[0] for s in sections] != expected:
         raise ValueError(
             "Thermal keyword contract violated; no loads/sources permitted"
@@ -185,7 +194,7 @@ def audit_deck(deck, config, mesh):
         raise ValueError(
             "Serialized conductivity, temperatures, procedure or output differs from specification"
         )
-    return {
+    audit = {
         "passed": True,
         "nodes": len(nodes),
         "elements": len(elements),
@@ -193,3 +202,24 @@ def audit_deck(deck, config, mesh):
         "hot_nodes": (mesh[1] + 1) * (mesh[2] + 1),
         "cold_nodes": (mesh[1] + 1) * (mesh[2] + 1),
     }
+    if sourced(config):
+        rows = data["*DFLUX"]
+        if len(rows) != 1:
+            raise ValueError("Exactly one full-volume body source is required")
+        fields = [x.strip() for x in rows[0].split(",")]
+        if (
+            len(fields) != 3
+            or fields[:2] != ["SLAB", "BF"]
+            or float(fields[2]) != config["internal_heat_generation"]
+            or "volumetric BF W/m^3" not in data["*HEADING"][0]
+        ):
+            raise ValueError("Wrong BF source magnitude, sign, units or region")
+        audit["volumetric_source"] = {
+            "unit": "W/m^3",
+            "region": "all_volume",
+            "source_files": ["slab.inp"],
+            "element_values": [
+                {"element": e, "value": float(fields[2])} for e in sorted(elements)
+            ],
+        }
+    return audit

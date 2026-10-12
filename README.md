@@ -56,6 +56,17 @@ comparison and replay. It retains build provenance, complete native evidence and
 actual converged-but-wrong boundary-condition failure evidence. Agreement is
 corroboration, not proof of correctness or industrial qualification.
 
+## Mission 5: volumetric source and measured convergence
+
+Both solvers also solve the same slab with native 100000 W/m³ heat generation
+on four meshes. Actual nodal DOFs define nonnodal volume temperature, gradient
+and raw Fourier-flux errors; quadrature prevents exact nodal interpolation from
+masquerading as zero discretization error. Reaction/source balance, separate
+native/recovered flux diagnostics, coordinate-based comparison, convergence
+plots and semantic archive replay are required. CI retains 74 existing tests
+and adds 24 source/adversarial tests. See [source derivation, accuracy budgets
+and reproduction](docs/source-thermal.md).
+
 ## Cloud and Android workflow
 
 Development happens through Codex Cloud and GitHub. No local installation or
@@ -95,7 +106,8 @@ python -m open_cae_evidence.benchmark --verify-evidence evidence/thermal
 ```
 
 Output directories must be new, so stale results cannot silently validate a run.
-Simulation and verification need no AI service. JSON Schema validation uses pinned
+Simulation and verification need no AI service. Source convergence plots/replay
+use the pinned open-source `.[plots]` extra. JSON Schema validation uses pinned
 open-source `jsonschema` and pinned transitive dependencies; the numerical code
 uses Python's standard library. The build backend and Actions
 are pinned; Ubuntu package signatures and TLS verification stay enabled. Transitive
