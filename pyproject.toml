@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools==75.8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open-cae-evidence"
+version = "0.1.0"
+description = "Reproducible CalculiX cantilever modal benchmark"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+dependencies = []
+
+[project.scripts]
+cae-benchmark = "open_cae_evidence.benchmark:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
