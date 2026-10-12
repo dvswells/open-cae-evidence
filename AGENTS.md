@@ -12,6 +12,17 @@
   in separate new output directories, and `--verify-evidence` on each before
   declaring readiness. Both archived DAT and FRD semantics must pass.
   Test runner exit status must survive log capture (`set -o pipefail`).
+- Also execute `benchmarks/slab_steady_heat.json` and replay its evidence. All
+  three cases must emit validated `normalized-results.json` contract 1.0.0.
+  Preserve the original 29 tests and all modal tolerances/physics. Thermal checks
+  require actual NT/HFL/RFL/COORD output, independent Fourier comparisons and
+  separately evaluated reaction/flux conservation. A linear patch-exact thermal
+  solution requires mesh consistency, not artificial monotonic convergence.
+- Keep solver serialization, execution and extraction in the adapter, physical
+  references/checks in solver-independent modules, and provenance/evidence in
+  their common layer. See docs/architecture.md and docs/results-schema.md.
+  Do not fabricate unavailable quantities or treat schema validity as physical
+  verification. Reject unknown versions; retain legacy v1/v2 archive replay.
 - Use the pinned Ubuntu Actions workflow for independent reproduction. Keep solver
   inputs, outputs, logs, provenance, hashes, reports and failed-run evidence.
 - Keep numerical assumptions and justified acceptance criteria explicit. Do not

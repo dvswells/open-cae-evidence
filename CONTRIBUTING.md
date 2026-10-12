@@ -10,6 +10,18 @@ to physics, reference equations, meshing or parsers need relevant positive and
 negative tests and real-solver evidence. Preserve the failing case during diagnosis.
 Do not replace a scientific test with a successful process exit or zero-test run.
 
+Keep physical specifications, solver adapters, independent verification and
+evidence responsibilities separate. Read [architecture](docs/architecture.md)
+and [the public results contract](docs/results-schema.md) before extending an
+adapter or analysis. Required quantities must have explicit units, locations,
+components and actual solver/postprocessing provenance. Do not manufacture
+missing values. Preserve legacy archive replay and unknown-version rejection.
+
+CI must run both structural benchmarks and the thermal slab, all 29 existing
+tests and new relevant scientific/contract tests. Do not require monotonic
+convergence for a patch-exact linear thermal solution. The source distribution
+includes the JSON Schema; packaging changes must preserve it.
+
 Reference definitions must have equations, units, assumptions and an open source
 or an independently reproducible derivation. Specify tolerances before comparing
 new solver output; changes to acceptance criteria need physical justification.

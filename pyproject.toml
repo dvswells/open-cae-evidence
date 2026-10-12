@@ -4,14 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "open-cae-evidence"
-version = "0.2.0"
-description = "Reproducible CalculiX cantilever modal benchmark"
+version = "0.3.0"
+description = "Solver-independent CAE verification with reproducible modal and thermal evidence"
 requires-python = ">=3.11"
 license = {text = "MIT"}
-dependencies = []
+dependencies = ["jsonschema==4.23.0", "jsonschema-specifications==2024.10.1", "referencing==0.35.1", "rpds-py==0.22.3", "attrs==25.1.0"]
 
 [project.scripts]
 cae-benchmark = "open_cae_evidence.benchmark:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+open_cae_evidence = ["schemas/*.json"]

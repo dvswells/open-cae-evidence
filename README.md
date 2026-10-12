@@ -23,6 +23,23 @@ equation, verifies mass-scaling and coupling, and checks archived FRD semantics
 against the audited mesh and DAT. See [tip-mass formulation](docs/tip-mass.md).
 The original benchmark remains unchanged and both cases run in CI.
 
+## Mission 3: solver-independent evidence and steady thermal conduction
+
+The two modal cases now run through separate physical specifications, a CalculiX
+adapter, independent numerical verifiers and common evidence generation/replay.
+All three benchmarks emit the versioned solver-independent
+`normalized-results.json` contract, including units, mesh, BCs, provenance,
+quantities, tolerances, physical outcomes and unsupported capabilities.
+See [architecture and adapter interfaces](docs/architecture.md) and
+[results schema](docs/results-schema.md).
+
+The third benchmark solves a real 3D homogeneous slab with opposing prescribed
+temperatures and insulated sides. Fourier references, nodal temperatures,
+gradients, actual solver flux, integrated flow and independent reaction-based
+energy conservation are checked on three meshes. This is a **mesh-consistency**
+test: the exact linear solution belongs to the affine Q1 element space, so no
+monotonic error reduction is required. See [thermal derivation](docs/thermal.md).
+
 ## Cloud and Android workflow
 
 Development happens through Codex Cloud and GitHub. No local installation or
@@ -52,17 +69,21 @@ python -m open_cae_evidence.benchmark --output evidence/benchmark
 python -m open_cae_evidence.benchmark --verify-evidence evidence/benchmark
 python -m open_cae_evidence.benchmark --config benchmarks/cantilever_tip_mass.json --output evidence/tip-mass
 python -m open_cae_evidence.benchmark --verify-evidence evidence/tip-mass
+python -m open_cae_evidence.benchmark --config benchmarks/slab_steady_heat.json --output evidence/thermal
+python -m open_cae_evidence.benchmark --verify-evidence evidence/thermal
 ```
 
 Output directories must be new, so stale results cannot silently validate a run.
-Runtime Python code uses only the standard library. The build backend and Actions
+Simulation and verification need no AI service. JSON Schema validation uses pinned
+open-source `jsonschema` and pinned transitive dependencies; the numerical code
+uses Python's standard library. The build backend and Actions
 are pinned; Ubuntu package signatures and TLS verification stay enabled. Transitive
 system libraries and hosted runner images can change; their versions are recorded.
 
 ## Scope and license
 
-Only a uniform, slender, isotropic, undamped, unprestressed, linear elastic
-cantilever, with or without ideal translational tip inertia, is covered. No
+Only the two ideal linear elastic cantilevers and homogeneous isotropic steady
+conduction on affine rectangular elements are covered. No
 FreeCAD, extra solver or optimizer is included. This is
 numerical verification, not experimental validation or industrial qualification.
 See [contributor guidelines](CONTRIBUTING.md) and [agent instructions](AGENTS.md).
@@ -70,3 +91,6 @@ See [contributor guidelines](CONTRIBUTING.md) and [agent instructions](AGENTS.md
 Project code, documentation, input and analytical reference definitions are
 MIT licensed. CalculiX is an independently distributed GPL-licensed dependency;
 we do not relicense or vendor it. Generated benchmark data is offered under MIT.
+
+No MCP server, graphical interface, second solver or coupled-physics solver is
+implemented. The architecture documents extension points and their current limits.
