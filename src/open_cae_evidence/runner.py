@@ -9,6 +9,7 @@ import subprocess
 import sys
 
 from .adapters.calculix import CalculiXAdapter
+from .adapters.elmer import ElmerAdapter
 from .evidence import manifest, provenance, sha256, verify_manifest, write_json
 from .modal_report import report as modal_report
 from .results import (
@@ -109,6 +110,7 @@ def run_benchmark(config, output, executable, adapter=None):
     write_json(output / "provenance.json", identity)
     result = {
         "schema_version": ARCHIVE_VERSION,
+        "solver_name": adapter.name,
         "status": "failed",
         "config": config,
         "tolerances": verifier.tolerances,
@@ -182,6 +184,8 @@ def replay(directory, adapter=None):
     identity = json.loads((directory / "provenance.json").read_text())
     if identity.get("solver_name", adapter.name) != adapter.name:
         raise ValueError("Archived solver requires an explicit matching adapter")
+    if hasattr(adapter, "validate_provenance"):
+        adapter.validate_provenance(identity)
     normalized_runs = []
     runs = []
     for counts in problem.parameters["meshes"]:
@@ -248,15 +252,17 @@ def main(argv=None):
         "--config", type=Path, default=Path("benchmarks/cantilever.json")
     )
     parser.add_argument("--output", type=Path, default=Path("evidence/benchmark"))
-    parser.add_argument("--solver", default="ccx")
+    parser.add_argument("--adapter", choices=("calculix", "elmer"), default="calculix")
+    parser.add_argument("--solver")
     parser.add_argument("--verify-evidence", type=Path)
     args = parser.parse_args(argv)
+    adapter = ElmerAdapter() if args.adapter == "elmer" else CalculiXAdapter()
     if args.verify_evidence:
-        replay(args.verify_evidence)
+        replay(args.verify_evidence, adapter)
         return 0
     config = json.loads(args.config.read_text())
     load_problem(config)
-    solver = shutil.which(args.solver)
+    solver = shutil.which(args.solver or ("ElmerSolver" if args.adapter == "elmer" else "ccx"))
     if not solver:
-        raise RuntimeError("Real solver executable required; install calculix-ccx")
-    return run_benchmark(config, args.output, solver)
+        raise RuntimeError(f"Real {adapter.name} solver executable required")
+    return run_benchmark(config, args.output, solver, adapter)

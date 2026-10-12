@@ -40,6 +40,22 @@ energy conservation are checked on three meshes. This is a **mesh-consistency**
 test: the exact linear solution belongs to the affine Q1 element space, so no
 monotonic error reduction is required. See [thermal derivation](docs/thermal.md).
 
+## Mission 4: independent Elmer interoperability
+
+The same slab specification now runs with **CalculiX and Elmer 9.0**, using the
+unchanged `ThermalVerifier` and results contract 1.0.0. Elmer is compiled headlessly
+from a pinned official source commit. Audited native 808 meshes/SIF, complete VTU
+temperatures, native heat loads and L2-recovered nodal flux are retained. Gauss
+sampling of the recovered field is explicitly labeled as postprocessing.
+Physical-coordinate comparisons require both independent verification and native
+archive replay to pass first. See [Elmer runtime, semantics and limits](docs/elmer.md).
+
+[The Elmer Actions workflow](.github/workflows/elmer.yml) runs all **48 preserved
+tests plus 26 Elmer/interoperability tests**, all four solver/benchmark executions,
+comparison and replay. It retains build provenance, complete native evidence and
+actual converged-but-wrong boundary-condition failure evidence. Agreement is
+corroboration, not proof of correctness or industrial qualification.
+
 ## Cloud and Android workflow
 
 Development happens through Codex Cloud and GitHub. No local installation or
@@ -49,6 +65,11 @@ open **Actions → Verified cantilever modal benchmark → run** to read the tec
 report in the run summary and download `cantilever-evidence-<run>-<attempt>`.
 The workflow also supports **Run workflow** once it exists on the default branch.
 PRs remain unmerged until owner approval.
+
+Also inspect **Actions → Independent Elmer thermal verification** for the
+`elmer-evidence-<run>-<attempt>` artifact and the common/cross-solver reports.
+Both workflows run automatically on pushes and PRs; dispatch becomes available
+from the default branch once the workflow is merged with owner approval.
 
 Artifacts retain each solver input, raw `.dat` and `.frd`, solver logs, nodal CSV
 for all six modes, audits, JSON verification, convergence results, SHA-256 manifest
@@ -84,13 +105,14 @@ system libraries and hosted runner images can change; their versions are recorde
 
 Only the two ideal linear elastic cantilevers and homogeneous isotropic steady
 conduction on affine rectangular elements are covered. No
-FreeCAD, extra solver or optimizer is included. This is
+FreeCAD, graphical interface or optimizer is included. This is
 numerical verification, not experimental validation or industrial qualification.
 See [contributor guidelines](CONTRIBUTING.md) and [agent instructions](AGENTS.md).
 
 Project code, documentation, input and analytical reference definitions are
 MIT licensed. CalculiX is an independently distributed GPL-licensed dependency;
-we do not relicense or vendor it. Generated benchmark data is offered under MIT.
+we do not relicense or vendor it. Elmer retains upstream GPL/LGPL terms;
+compiled artifacts include the upstream license texts. Generated benchmark data is offered under MIT.
 
-No MCP server, graphical interface, second solver or coupled-physics solver is
-implemented. The architecture documents extension points and their current limits.
+No MCP server or coupled-physics workflow is implemented. Elmer supports only the
+verified steady slab here. The architecture documents extension points and limits.

@@ -1,7 +1,9 @@
 # Architecture and public interfaces
 
 Mission 3 introduces two independent boundaries: a physical problem/verification
-boundary and a solver/serialization boundary. CalculiX is the only solver adapter.
+boundary and a solver/serialization boundary. CalculiX and Elmer are separate
+adapters; Elmer currently implements only the steady slab. Both use the same
+ProblemSpec and unchanged ThermalVerifier, with no duplicated analytical reference.
 No plugin registry, server, UI, workflow engine or LLM dependency is introduced.
 
 ```mermaid
@@ -23,6 +25,8 @@ flowchart LR
 | `specification.py`, `modal_problem.py`, `thermal_problem.py` | Physical configuration, units, BCs, supported domain | Invoke a solver |
 | `interfaces.py` | Small dataclasses and structural Python protocols | Own physics or a plugin framework |
 | `adapters/calculix.py` | Generate input, execute, extract, normalize, validate raw output semantics | Fit or evaluate analytical references |
+| `adapters/elmer.py`, `elmer_input.py`, `elmer_output.py` | Audit native SIF/808 mesh, execute pinned Elmer, extract VTU and explicitly normalize recovered flux | Change the physical verifier or label recovered flux as native integration-point data |
+| `comparison.py` | Replay both archives, recheck independent gates and compare physical coordinates | Treat solver agreement as correctness |
 | `model.py`, `thermal_input.py` | CalculiX input serializers/auditors | Claim successful output verification |
 | `adapters/modal_dat.py`, `frd.py`, `thermal_output.py` | CalculiX DAT/FRD codecs and cross-file checks | Substitute analytical numbers for missing solver results |
 | `reference.py`, `thermal_problem.analytical` | Independent analytical equations | Read FEM output |
@@ -74,7 +78,12 @@ adapter instance (default CalculiX). `replay(directory, adapter=None)` regenerat
 input, re-extracts raw fields, repeats physical checks, validates the schema and
 compares the contract with the archived one. No solver or AI runs during replay.
 An archive for another adapter requires its matching explicit adapter instance.
-The current CLI deliberately exposes only the implemented CalculiX workflow.
+CLI selection is `--adapter calculix` (default) or `--adapter elmer`, with optional
+`--solver` executable override. Elmer archives require `--adapter elmer` on replay.
+Optional adapter hooks `runtime_provenance(executable)` and
+`validate_provenance(identity)` record/check source and library identity; they
+do not enter physical verification and are not required by the three-method
+protocol. [Elmer](elmer.md) is the concrete second-adapter example.
 
 ## Results contract and evidence
 
@@ -90,7 +99,7 @@ JSON Schema is validated using pinned, open-source `jsonschema`; physical covera
 units and verdict consistency are checked additionally. This library is not a
 simulation or orchestration framework. All schema resources ship in the Python wheel.
 
-The common archive layout for all three benchmarks is:
+The common archive layout for all four solver/benchmark executions is:
 
 ```
 config.json
@@ -101,6 +110,8 @@ report.md
 manifest.json                # SHA-256 of every other file
 mesh-<nx>x<ny>x<nz>/
   <beam|slab>.inp/.dat/.frd
+  # Elmer instead: slab.sif, mesh.header/nodes/elements/boundary,
+  # units.json, slab_t0001.vtu (native fields and physical topology)
   solver.log                 # plus other native solver files
   input-audit.json
   solver-results.json
@@ -144,16 +155,21 @@ An adapter can normalize another solver on these meshes now. Supporting tetrahed
 curved cells or different analyses requires an explicit schema/verifier extension;
 changing the adapter alone must not make unsupported physics appear verified.
 
+Elmer demonstrates the second adapter without modifying the physical verifier
+or the common schema. Native nodal L2 flux is retained separately and sampled
+at common physical Gauss coordinates as `postprocessed_from_solver`. It must
+not be described as a native integration-point field. See [Elmer](elmer.md).
+
 Future, unimplemented integrations:
 
-- **Code_Aster** and **Elmer** could supply solver adapters with the same physical
+- **Code_Aster** could supply a solver adapter with the same physical
   problem specifications, normalized fields and raw evidence obligations.
 - **Gmsh** is a mesh provider, not a solver; it could supply mesh generation with
   independent geometry/topology audits before a solver adapter serializes the input.
 - **FreeCAD** is a geometry/preprocessing source, not an analytical reference;
   its future headless use would enter before audited physical input generation.
 
-No such tool, second solver, coupled-physics analysis or optimizer is implemented here.
+No such additional tool, coupled-physics analysis or optimizer is implemented here.
 
 ## Downstream MCP compatibility
 

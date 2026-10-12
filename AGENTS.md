@@ -31,6 +31,12 @@
   No proprietary solver, paid API or paid infrastructure. Prefer existing open
   tools. Do not add FreeCAD, MCP, another solver or optimization until this
   benchmark is verified and the owner authorizes expanding scope.
+- Mission 4 authorizes Elmer for the existing steady slab only. Execute the
+  pinned headless build workflow, all 48 original tests and `tests_elmer`, both
+  thermal adapters, coordinate-based comparison and native/comparison replay.
+  Preserve native Elmer SIF/mesh/VTU/log/provenance and actual failure-injection
+  evidence. Never label Elmer L2 nodal flux recovery as native Gauss output.
+  ThermalVerifier, schema 1.0.0 and original tolerances remain unchanged.
 - Treat modal eigenvectors as sign/scale arbitrary. Match physical directions and
   shapes, not only ascending frequency indices. Check units and the serialized clamp.
 - Keep the tip MASS node independent; transfer its translation through the full

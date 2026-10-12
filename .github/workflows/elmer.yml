@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
+      PYTHONPATH: src
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
     steps:
@@ -19,10 +20,13 @@ jobs:
           mkdir -p evidence/elmer-build
           sudo apt-get update
           apt-cache search '^elmer' > evidence/elmer-build/ubuntu-package-search.txt
-          sudo apt-get install --no-install-recommends -y build-essential cmake gfortran libblas-dev liblapack-dev
+          sudo apt-get install --no-install-recommends -y build-essential=12.10ubuntu1 cmake=3.28.3-1build7 gcc-13=13.3.0-6ubuntu2~24.04.1 g++-13=13.3.0-6ubuntu2~24.04.1 gfortran-13=13.3.0-6ubuntu2~24.04.1 libblas-dev=3.12.0-3build1.1 liblapack-dev=3.12.0-3build1.1 calculix-ccx=2.21-1
           dpkg-query -W > evidence/elmer-build/packages.txt
       - name: Clean headless official-source build
-        run: bash scripts/build-elmer.sh "$RUNNER_TEMP/elmer" "$RUNNER_TEMP/elmer-build"
+        run: |
+          export PATH="/usr/bin:/bin:$PATH"
+          export CC=gcc-13 CXX=g++-13 FC=gfortran-13
+          bash scripts/build-elmer.sh "$RUNNER_TEMP/elmer" "$RUNNER_TEMP/elmer-build"
       - name: Prove actual solver and mesh utility execution
         shell: bash
         run: |
@@ -35,12 +39,64 @@ jobs:
           cd evidence/runtime-proof
           ElmerGrid 1 2 cross 2>&1 | tee grid.log
           ElmerSolver case.sif 2>&1 | tee solver.log
-          test -s case_t0001.vtu
+          test -s cross/case_t0001.vtu
+          test -s TEST.PASSED
           grep -q 'ELMER SOLVER FINISHED' solver.log
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12.14"
+      - name: Install the common framework and expose compiled runtime
+        run: |
+          python -m pip install --disable-pip-version-check .
+          echo "$RUNNER_TEMP/elmer/bin" >> "$GITHUB_PATH"
+          python -m pip freeze > evidence/elmer-build/python-packages.txt
+      - name: All 48 original regression tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m unittest discover -s tests -v 2>&1 | tee evidence/original-tests.log
+      - name: Real Elmer adversarial and interoperability tests
+        shell: bash
+        env:
+          CAE_ELMER_TEST_EVIDENCE: evidence/failure-injection
+        run: |
+          set -o pipefail
+          python -m unittest discover -s tests_elmer -v 2>&1 | tee evidence/elmer-tests.log
+      - name: Preserve and replay both modal benchmarks
+        run: |
+          python -m open_cae_evidence.benchmark --output evidence/benchmark
+          python -m open_cae_evidence.benchmark --verify-evidence evidence/benchmark
+          python -m open_cae_evidence.benchmark --config benchmarks/cantilever_tip_mass.json --output evidence/tip-mass
+          python -m open_cae_evidence.benchmark --verify-evidence evidence/tip-mass
+      - name: Same slab, both solvers, unchanged physical verification
+        run: |
+          python -m open_cae_evidence.benchmark --config benchmarks/slab_steady_heat.json --output evidence/thermal
+          python -m open_cae_evidence.benchmark --adapter elmer --config benchmarks/slab_steady_heat.json --output evidence/elmer-thermal
+      - name: Native archive replay and physical-coordinate comparison
+        run: |
+          python -m open_cae_evidence.comparison --calculix evidence/thermal --elmer evidence/elmer-thermal --output evidence/comparison
+          python -m open_cae_evidence.comparison --calculix evidence/thermal --elmer evidence/elmer-thermal --output evidence/comparison --replay
+      - name: Publish technical reports
+        if: always()
+        run: |
+          for folder in benchmark tip-mass thermal elmer-thermal comparison; do
+            if test -f "evidence/$folder/report.md"; then
+              cat "evidence/$folder/report.md" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
       - name: Retain build and execution provenance
         if: always()
         run: |
           cp "$RUNNER_TEMP/elmer-build/"*.{txt,log} evidence/elmer-build/ 2>/dev/null || true
+          if test -f "$RUNNER_TEMP/elmer/source-commit.txt"; then
+            tar -czf evidence/elmer-build/compiled-runtime.tar.gz -C "$RUNNER_TEMP/elmer" .
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          from open_cae_evidence.evidence import manifest, write_json
+          root = Path('evidence')
+          write_json(root / 'manifest.json', manifest(root))
+          PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

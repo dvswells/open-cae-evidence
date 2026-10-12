@@ -50,7 +50,7 @@ def provenance(executable, adapter):
     )
     from pathlib import Path
 
-    return {
+    identity = {
         "python": sys.version,
         "platform": platform.platform(),
         "solver_path": executable,
@@ -63,3 +63,6 @@ def provenance(executable, adapter):
         "github_sha": os.environ.get("GITHUB_SHA"),
         "threads": 1,
     }
+    if hasattr(adapter, "runtime_provenance"):
+        identity.update(adapter.runtime_provenance(Path(executable)))
+    return identity

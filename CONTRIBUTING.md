@@ -17,8 +17,9 @@ adapter or analysis. Required quantities must have explicit units, locations,
 components and actual solver/postprocessing provenance. Do not manufacture
 missing values. Preserve legacy archive replay and unknown-version rejection.
 
-CI must run both structural benchmarks and the thermal slab, all 29 existing
-tests and new relevant scientific/contract tests. Do not require monotonic
+CI must run both structural benchmarks, the thermal slab with CalculiX and Elmer,
+all 48 preserved tests and the 26 tests in `tests_elmer`, comparison and replay.
+See [Elmer reproduction and native semantics](docs/elmer.md). Do not require monotonic
 convergence for a patch-exact linear thermal solution. The source distribution
 includes the JSON Schema; packaging changes must preserve it.
 
@@ -30,4 +31,4 @@ or regenerable result files; Actions artifacts carry run-specific evidence.
 
 License contributions under this repository's MIT license. Do not include
 proprietary solver results or restricted reference datasets. CalculiX retains its
-own GPL terms. Never include credentials in reports, commits or artifacts.
+own GPL terms; Elmer retains its GPL/LGPL terms. Never include credentials in reports, commits or artifacts.

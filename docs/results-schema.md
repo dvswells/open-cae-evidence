@@ -68,6 +68,14 @@ solver exit code. The archive contract includes a failed status for incomplete
 execution when extractable evidence is available; a passed contract requires
 exactly the prescribed mesh study and all required checks.
 
+Elmer uses this unchanged 1.0.0 schema. `recovered_nodal_heat_flux` is an optional
+native nodal vector quantity. Required `heat_flux` uses integration-point sample
+locations but source `postprocessed_from_solver`: Q1 sampling of native L2 nodal
+recovery. **Location does not imply native provenance.** Inspect source kind,
+files and notes before comparing fields. CalculiX's required heat_flux is native
+Gauss data. The constant slab allows comparison at matching physical coordinates;
+general fields need additional recovery-error analysis. See [Elmer](elmer.md).
+
 Versioning is explicit. The **results contract** version 1.0.0 differs from the
 **archive index** versions 1/2/3 and the thermal **input specification** version 1.0.
 Unknown versions are rejected pending an implemented compatibility/migration policy.
