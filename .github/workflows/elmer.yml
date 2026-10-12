@@ -1,0 +1,47 @@
+name: Independent Elmer thermal verification
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  elmer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify package availability and install signed build dependencies
+        run: |
+          mkdir -p evidence/elmer-build
+          sudo apt-get update
+          apt-cache search '^elmer' > evidence/elmer-build/ubuntu-package-search.txt
+          sudo apt-get install --no-install-recommends -y build-essential cmake gfortran libblas-dev liblapack-dev
+          dpkg-query -W > evidence/elmer-build/packages.txt
+      - name: Clean headless official-source build
+        run: bash scripts/build-elmer.sh "$RUNNER_TEMP/elmer" "$RUNNER_TEMP/elmer-build"
+      - name: Prove actual solver and mesh utility execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$RUNNER_TEMP/elmer/bin:$PATH"
+          mkdir -p evidence/runtime-proof
+          cp "$RUNNER_TEMP/elmer-build/source/fem/tests/HeatUniso/"{case.sif,cross.grd,ELMERSOLVER_STARTINFO} evidence/runtime-proof/
+          cd evidence/runtime-proof
+          ElmerGrid 1 2 cross 2>&1 | tee grid.log
+          ElmerSolver case.sif 2>&1 | tee solver.log
+          test -s case.vtu
+          grep -q 'ELMER SOLVER FINISHED' solver.log
+      - name: Retain build and execution provenance
+        if: always()
+        run: |
+          cp "$RUNNER_TEMP/elmer-build/"*.{txt,log} evidence/elmer-build/ 2>/dev/null || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: elmer-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          retention-days: 30
