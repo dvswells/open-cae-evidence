@@ -1,0 +1,13 @@
+{
+  "source": "https://github.com/dvswells/open-cae-evidence/actions/runs/38295206198",
+  "source_commit": "2164a2e16a9daa011b46aab4df04218a3f8163df",
+  "solver": "CalculiX 2.21, Ubuntu 24.04",
+  "case": "Unmodified real 2x2x2 thermal output; initial CI failed on adapter STEP/INCREMENT parsing, not solver execution.",
+  "license": "MIT for project-generated data; solver remains GPL",
+  "sha256": {
+    "slab.inp": "ba3b5e9093fef07c18118339c38ec0f7d6d4d6a4fa9638d5d3954d6ddc4302df",
+    "slab.dat": "69927fde37eb1a48b3671c6039a65d1740fa831058ca6ff78288f4be0dfeb00e",
+    "slab.frd": "24a35d1ee7652a02d35b3df195dd323a4ff4835a575d4aa886335c1ed921577f",
+    "solver.log": "5120ece3d3a80e4086c0a9dbe50daa391b00ffb5157c26a3dccb9f2831d86886"
+  }
+}

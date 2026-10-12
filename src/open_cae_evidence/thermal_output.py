@@ -1,6 +1,7 @@
 """CalculiX thermal DAT extraction and ASCII FRD cross-file semantics."""
 
 import math
+import re
 
 from .frd import vector_row
 
@@ -13,12 +14,26 @@ def parse_dat(text, nodes, elements):
         "global coordinates (elem, integ.pnt.,x,y,z)": ("integration_coordinates", 5),
     }
     data = {}
+    markers = []
     lines = text.splitlines()
     i = 0
     while i < len(lines):
         line = lines[i].strip()
         matched = [info for prefix, info in names.items() if line.startswith(prefix)]
         if not line:
+            i += 1
+            continue
+        # CalculiX 2.21 emits explicit STEP/INCREMENT metadata absent in 2.20.
+        # Accept only the one supported steady step/increment before any fields.
+        marker = (
+            "step"
+            if re.fullmatch(r"S\s+T\s+E\s+P\s+1", line)
+            else ("increment" if re.fullmatch(r"INCREMENT\s+1", line) else None)
+        )
+        if marker is not None:
+            if data or markers != ([] if marker == "step" else ["step"]):
+                raise ValueError("Unexpected thermal DAT step/increment sequence")
+            markers.append(marker)
             i += 1
             continue
         if len(matched) != 1 or "and time" not in line or float(line.split()[-1]) != 1:
@@ -43,6 +58,8 @@ def parse_dat(text, nodes, elements):
             records[key] = values[0] if width == 2 else tuple(values)
             i += 1
         data[name] = records
+    if markers not in ([], ["step", "increment"]):
+        raise ValueError("Incomplete thermal DAT step/increment metadata")
     if set(data) != {
         "temperature",
         "heat_rate",
