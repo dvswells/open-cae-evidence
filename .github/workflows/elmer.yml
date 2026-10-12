@@ -35,7 +35,7 @@ jobs:
           cd evidence/runtime-proof
           ElmerGrid 1 2 cross 2>&1 | tee grid.log
           ElmerSolver case.sif 2>&1 | tee solver.log
-          test -s case.vtu
+          test -s case_t0001.vtu
           grep -q 'ELMER SOLVER FINISHED' solver.log
       - name: Retain build and execution provenance
         if: always()
