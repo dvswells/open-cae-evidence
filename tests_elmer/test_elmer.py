@@ -125,6 +125,15 @@ class ElmerIntegrationTests(unittest.TestCase):
                 load_problem(config)
 
     def test_wrong_serialized_conductivity(self):
+        # The independently parsed audit also fails without relying on the
+        # canonical text comparison used to reject unsupported keywords.
+        with self.assertRaises(ValueError):
+            elmer_input.audit_sif(
+                self.prepared.files["slab.sif"].replace(
+                    "Heat Conductivity = Real 10", "Heat Conductivity = Real 20"
+                ),
+                self.config,
+            )
         with self.assertRaises(ValueError):
             self.audit(
                 **{

@@ -157,9 +157,106 @@ def generate(config, counts):
     return files, nodes, elements
 
 
+def audit_sif(text, config):
+    """Parse physical assignments independently of the SIF text generator."""
+    sections, active = {}, None
+    for raw in text.splitlines():
+        line = raw.split("!", 1)[0].strip().lower()
+        if not line:
+            continue
+        if line == "end":
+            if active is None:
+                raise ValueError("Unexpected SIF End")
+            active = None
+        elif active is None:
+            if line in sections:
+                raise ValueError("Duplicate SIF section")
+            active = line
+            sections[active] = {}
+        else:
+            if active == "header" and line == "check keywords warn":
+                sections[active]["check keywords"] = "warn"
+                continue
+            if active == "header" and line.startswith("mesh db "):
+                if "mesh db" in sections[active]:
+                    raise ValueError("Duplicate native mesh location")
+                sections[active]["mesh db"] = line[len("mesh db ") :]
+                continue
+            if "=" not in line:
+                raise ValueError("Malformed SIF assignment")
+            key, value = (v.strip() for v in line.split("=", 1))
+            if key in sections[active]:
+                raise ValueError("Duplicate SIF keyword")
+            sections[active][key] = value
+    if active is not None:
+        raise ValueError("Unclosed SIF section")
+    expected = {
+        "header": {"mesh db": '"." "."'},
+        "simulation": {
+            "coordinate system": "cartesian 3d",
+            "coordinate mapping(3)": "1 2 3",
+            "simulation type": "steady state",
+            "steady state max iterations": "1",
+        },
+        "body 1": {"target bodies(1)": "1", "material": "1", "equation": "1"},
+        "equation 1": {"active solvers(3)": "1 2 3"},
+        "boundary condition 1": {"target boundaries(1)": "1"},
+        "boundary condition 2": {"target boundaries(1)": "2"},
+        "boundary condition 3": {"target boundaries(4)": "3 4 5 6"},
+        "solver 1": {
+            "procedure": '"heatsolve" "heatsolver"',
+            "variable": "temperature",
+            "variable dofs": "1",
+            "calculate loads": "true",
+            "stabilize": "false",
+        },
+        "solver 2": {
+            "procedure": '"fluxsolver" "fluxsolver"',
+            "target variable": "string temperature",
+            "flux coefficient": 'string "heat conductivity"',
+            "calculate flux": "true",
+        },
+        "solver 3": {"procedure": '"resultoutputsolve" "resultoutputsolver"'},
+    }
+    for section, assignments in expected.items():
+        if any(
+            sections.get(section, {}).get(key) != value
+            for key, value in assignments.items()
+        ):
+            raise ValueError("Parsed Elmer physical assignments/procedure differ")
+    numerical = [
+        ("material 1", "heat conductivity", config["material"]["conductivity"]),
+        ("material 1", "density", 1),
+        (
+            "boundary condition 1",
+            "temperature",
+            config["boundary"]["x_min_temperature"],
+        ),
+        (
+            "boundary condition 2",
+            "temperature",
+            config["boundary"]["x_max_temperature"],
+        ),
+        ("boundary condition 3", "heat flux", 0),
+    ]
+    for section, key, expected_value in numerical:
+        raw = sections.get(section, {}).get(key, "")
+        try:
+            value = float(raw.removeprefix("real "))
+        except ValueError as exc:
+            raise ValueError("Missing/malformed native physical property") from exc
+        if not math.isfinite(value) or not math.isclose(
+            value, expected_value, rel_tol=1e-14, abs_tol=1e-14
+        ):
+            raise ValueError(
+                "Parsed Elmer conductivity/temperature/flux differs from ProblemSpec"
+            )
+
+
 def audit(files, config, counts):
     """Independently parse geometry, cells, oriented faces and physical SIF."""
     validate(config)
+    audit_sif(files["slab.sif"], config)
     if (
         files["units.json"]
         != json.dumps(config["units"], sort_keys=True, indent=2) + "\n"

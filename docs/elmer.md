@@ -54,7 +54,9 @@ or its assembly/linear solution implementation.
 Mesh files contain native 808 bodies and outward-oriented 404 boundary quads.
 Audits independently parse coordinates, lattice membership, complete cells,
 connectivity, positive affine Jacobians, face orientation/parent membership and
-six physical face assignments. The SIF audit accepts only our canonical supported
+six physical face assignments. A separate SIF parser independently checks material,
+equation/procedure, coordinate mapping and boundary numerical assignments against
+ProblemSpec before the canonical supported-keyword comparison. The SIF audit accepts only our canonical supported
 keyword subset, rejecting property changes, missing/swapped boundary temperatures,
 coordinate permutations, sources and unsupported extra keywords. SI units are
 enforced by the physical specification, SIF and archived units.json. Elmer VTU
