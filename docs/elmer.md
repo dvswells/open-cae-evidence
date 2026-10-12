@@ -27,7 +27,8 @@ slab generator writes native mesh files directly and needs no mesh conversion.
 The workflow pins GCC/G++/gfortran 13.3.0 Ubuntu packages, CMake 3.28.3 and BLAS/
 LAPACK development packages. It retains package versions, compiler output,
 CMakeCache, source commit, configure/build/install logs, ldd dependency lists,
-binary hashes, upstream license texts and a compiled-runtime archive. A clean
+binary hashes, upstream license texts, a compiled-runtime archive and its
+corresponding complete pinned upstream source archive. A clean
 build is performed on each run, without cache-dependent claims. The build/job
 budget is 35 minutes; each benchmark solver process is limited to 120 seconds.
 The common Python version, package dependencies and Action revisions are pinned.

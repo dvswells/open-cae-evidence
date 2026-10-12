@@ -90,6 +90,7 @@ jobs:
           cp "$RUNNER_TEMP/elmer-build/"*.{txt,log} evidence/elmer-build/ 2>/dev/null || true
           if test -f "$RUNNER_TEMP/elmer/source-commit.txt"; then
             tar -czf evidence/elmer-build/compiled-runtime.tar.gz -C "$RUNNER_TEMP/elmer" .
+            git -C "$RUNNER_TEMP/elmer-build/source" archive --format=tar.gz --output="$GITHUB_WORKSPACE/evidence/elmer-build/upstream-source.tar.gz" HEAD
           fi
           python3 - <<'PY'
           from pathlib import Path
