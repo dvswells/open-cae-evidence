@@ -1,7 +1,7 @@
 # Open CAE Evidence
 
-[![Modal verification](https://github.com/dvswells/open-cae-evidence/actions/workflows/modal.yml/badge.svg?branch=feat%2Fsource-driven-thermal-convergence)](https://github.com/dvswells/open-cae-evidence/actions/workflows/modal.yml?query=branch%3Afeat%2Fsource-driven-thermal-convergence)
-[![Thermal verification](https://github.com/dvswells/open-cae-evidence/actions/workflows/elmer.yml/badge.svg?branch=feat%2Fsource-driven-thermal-convergence)](https://github.com/dvswells/open-cae-evidence/actions/workflows/elmer.yml?query=branch%3Afeat%2Fsource-driven-thermal-convergence)
+[![Modal verification](https://github.com/dvswells/open-cae-evidence/actions/workflows/modal.yml/badge.svg?branch=main)](https://github.com/dvswells/open-cae-evidence/actions/workflows/modal.yml?query=branch%3Amain)
+[![Thermal verification](https://github.com/dvswells/open-cae-evidence/actions/workflows/elmer.yml/badge.svg?branch=main)](https://github.com/dvswells/open-cae-evidence/actions/workflows/elmer.yml?query=branch%3Amain)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Reproducible numerical engineering benchmarks with independently replayable
