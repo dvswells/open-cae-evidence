@@ -3,7 +3,8 @@
 This benchmark extends the source-free patch test without changing it. Both
 adapters use `benchmarks/slab_volumetric_source.json`, the common `ProblemSpec`
 and `ThermalVerifier`. No analytical temperatures or fluxes are imposed inside
-the volume. Commit-specific Actions artifacts contain the actual measured values.
+the volume. Measured values appear in each workflow's technical reports; complete
+run-specific evidence can be retained as Actions artifacts when explicitly requested.
 
 ## Physical reference and sign conventions
 
@@ -160,7 +161,7 @@ threshold. The check removes only this explicitly propagated printing bound
 before applying the original 2×10⁻⁶ consistency budget.
 It does not weaken source-free gates or conceal discretization error. Small
 differences between CalculiX 2.20 and 2.21 runs, and between Elmer builds, may
-reflect assembly, recovery and printing; use artifact values for each exact run.
+reflect assembly, recovery and printing; use the measured values recorded for each exact run.
 
 Cross-solver comparison first replays both native archives and repeats independent
 physical gates. It matches coordinates, not node IDs, compares common Q1 fields
@@ -199,7 +200,9 @@ tables, semantic provenance, tolerances and deterministic log-log SVG plots.
 `analytical-reference.json` and per-mesh `nonnodal-samples.csv` supplement
 the existing native files, contracts, audits, verification JSON and manifests.
 Replay recomputes their semantics, not just hashes. SHA-256 integrity alone is
-not independent scientific correctness. Artifacts expire after 30 days.
+not independent scientific correctness. Full evidence artifacts are not uploaded
+by default. A maintainer can enable `upload_evidence` on a manual GitHub Actions
+run to retain the native files and reports for 30 days.
 
 Results contract **1.0.0 remains unchanged**; existing arbitrary named optional
 quantities carry units/locations/provenance. The input source is audited metadata,
