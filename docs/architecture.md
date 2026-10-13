@@ -1,11 +1,10 @@
 # Architecture and public interfaces
 
-Mission 3 introduces two independent boundaries: a physical problem/verification
-boundary and a solver/serialization boundary. CalculiX and Elmer are separate
+The architecture separates a physical problem/verification boundary and a
+solver/serialization boundary. CalculiX and Elmer are separate
 adapters; Elmer currently implements only the steady slab. Both use the same
-ProblemSpec and unchanged ThermalVerifier, with no duplicated analytical reference.
-No plugin registry, server, UI, workflow engine or LLM dependency is introduced.
-Mission 5 adds the uniform-source slab through the same interfaces; ThermalVerifier
+ProblemSpec and ThermalVerifier, with no duplicated analytical reference.
+The uniform-source slab uses the same interfaces; ThermalVerifier
 dispatches by physical problem, not adapter. Source-free verification is unchanged.
 
 ```mermaid
@@ -39,18 +38,17 @@ flowchart LR
 | `results.py`, packaged JSON Schema | Versioned, unit-bearing interoperability contract | Treat schema validity as physical verification |
 | `evidence.py`, report modules | Persistence, hashes, provenance, reports | Start user-operated services |
 | `runner.py` | Connect the components, CLI, compatibility replay | Embed solver-specific reference physics |
-| `benchmark.py` | Preserve Mission 1/2 imports and CLI | Duplicate the implementation |
+| `benchmark.py` | Preserve legacy imports and CLI | Duplicate the implementation |
 
-Existing mathematical checks were moved incrementally without changing the
-original 29 tests or modal tolerance values. The existing public imports from
-`benchmark`, `model` and `reference` remain available. Q8 transfer math is isolated
+The public imports from `benchmark`, `model` and `reference` remain available.
+Q8 transfer math is isolated
 in `coupling.py`; the serialized equations remain the CalculiX adapter's responsibility.
 
 ## Minimal interfaces
 
 `ProblemSpec` contains `id`, `analysis`, validated `parameters`, explicit `units`,
 physical `boundary_conditions`, `required_quantities` and `unsupported_capabilities`.
-`load_problem(config)` preserves unversioned Mission 1/2 physical input files;
+`load_problem(config)` preserves unversioned modal physical input files;
 the source-free thermal input explicitly declares `spec_version: "1.0"`.
 The separate sourced input uses 1.1 with explicit W/m³ source and region.
 
@@ -82,7 +80,7 @@ the public normalized IDs are not changed.
 `run_benchmark(config, output, executable, adapter=None)` accepts an explicit
 adapter instance (default CalculiX). `replay(directory, adapter=None)` regenerates
 input, re-extracts raw fields, repeats physical checks, validates the schema and
-compares the contract with the archived one. No solver or AI runs during replay.
+compares the contract with the archived one. No solver runs during replay.
 An archive for another adapter requires its matching explicit adapter instance.
 CLI selection is `--adapter calculix` (default) or `--adapter elmer`, with optional
 `--solver` executable override. Elmer archives require `--adapter elmer` on replay.
@@ -97,7 +95,7 @@ See [results schema](results-schema.md) and the packaged
 [`results-v1.json`](../src/open_cae_evidence/schemas/results-v1.json).
 `normalized-results.json` is the public, solver-independent contract (1.0.0).
 `results.json` is the internal evidence index (archive version 3) with retained
-Mission 1/2 fields for compatibility. Each mesh has `solver-results.json`, holding
+legacy modal fields for compatibility. Each mesh has `solver-results.json`, holding
 its normalized fields and verification. Keeping these layers explicit avoids
 silently assigning new meanings to legacy fields.
 
@@ -129,7 +127,7 @@ Sourced archives also contain `analytical-reference.json`, `convergence.svg`,
 `convergence-plot-data.json`, and per-mesh `nonnodal-samples.csv`.
 Their semantic replay recomputes all samples, norms, plots and source-aware
 checks from native DOFs. Plotting is an optional pinned dependency extra needed
-for sourced benchmark generation/replay; no LLM is involved. See [source case](source-thermal.md).
+for sourced benchmark generation/replay. See [source case](source-thermal.md).
 
 Only new output directories are accepted. Evidence with symlinks, unsafe manifest
 paths, changed/incomplete file sets, unsupported versions or disagreeing metadata
@@ -140,11 +138,11 @@ not rerun-solver eigenvectors, because signs and platform roundoff can differ.
 
 Legacy archive versions **1 and 2** replay their real modal files through the same
 adapter and physical checks. They lack the common contract and are not rewritten
-in place. Original PR #1/#2 CI archives were replayed in Cloud. Automated tests
-also construct legacy metadata layouts from real current solver fields. Unknown
-archive or contract versions fail explicitly; no `version >= latest` fallback.
+in place. Automated tests construct legacy metadata layouts from real current
+solver fields. Unknown archive or contract versions fail explicitly;
+there is no `version >= latest` fallback.
 
-## Implementing a second adapter
+## Implementing another adapter
 
 Implement the three protocol methods and normalize to the existing physical contract.
 For the current problems a second solver must preserve SI geometry/material/BCs,
@@ -183,12 +181,12 @@ Future, unimplemented integrations:
 
 No such additional tool, coupled-physics analysis or optimizer is implemented here.
 
-## Downstream MCP compatibility
+## Downstream interoperability
 
-An eventual MCP integration should consume the static versioned JSON/artifacts,
+External integrations should consume the static versioned JSON/artifacts,
 honor units, location/component semantics, optional quantities, provenance and
 unsupported-capability declarations. Schema validity is not a scientific verdict.
-It must inspect physical outcomes and raw-evidence replay, reject unsupported schema
-versions and enforce its own size/path/access limits when handling untrusted artifacts.
-It must not convert missing quantities to zero, claim certification, or merge PRs
-automatically. There is no MCP server or required LLM service in this repository.
+Integrations must inspect physical outcomes and raw-evidence replay, reject unsupported
+schema versions and enforce size/path/access limits when handling untrusted artifacts.
+Missing quantities must not be converted to zero, and benchmark outcomes must
+not be presented as certification.

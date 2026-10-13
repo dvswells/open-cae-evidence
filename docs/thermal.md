@@ -114,8 +114,7 @@ with its expected outcome, and all previous 29 structural tests remain unchanged
 
 The existing pinned Ubuntu Actions workflow runs all three benchmarks, validates
 the common results schema, replays all evidence and uploads raw and normalized
-files, reports, provenance and test logs. The owner needs no terminal or server.
-Contributors can independently reproduce without an AI:
+files, reports, provenance and test logs. Contributors can independently reproduce:
 
 ```sh
 python -m pip install .
@@ -131,8 +130,8 @@ dependencies, raw files and transitive runtime versions are retained, but hosted
 runner images are not immutable and hashes do not establish authenticity.
 
 No nonlinear, anisotropic, transient, conjugate or coupled thermal problem is
-verified. There is no experiment, hardware comparison, industrial qualification
-or ANSYS-equivalence claim. See [architecture](architecture.md) and
+verified. There is no experimental validation, hardware comparison or industrial
+qualification claim. See [architecture](architecture.md) and
 [results contract](results-schema.md) for extension and interoperability limits.
 
 Documentation: [CalculiX 2.21 manual](https://www.dhondt.de/ccx_2.21.pdf), `*ELEMENT`

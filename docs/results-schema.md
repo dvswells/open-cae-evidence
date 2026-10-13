@@ -79,12 +79,12 @@ general fields need additional recovery-error analysis. See [Elmer](elmer.md).
 Versioning is explicit. The **results contract** version 1.0.0 differs from the
 **archive index** versions 1/2/3 and the thermal **input specification** version 1.0.
 Unknown versions are rejected pending an implemented compatibility/migration policy.
-New topologies or analyses need a documented compatible version and tests. Existing
-Mission 1/2 raw files and index fields remain available; legacy replay adds checks
+New topologies or analyses need a documented compatible version and tests.
+Legacy modal raw files and index fields remain available; legacy replay adds checks
 without silently mutating or manufacturing missing contract files.
 
-Mission 5 retains results schema **1.0.0** and archive index 3. Its separate
-physical input specification 1.1 adds explicit source units and full-volume
+The sourced benchmark retains results schema **1.0.0** and archive index 3.
+Its separate physical input specification 1.1 adds explicit source units and full-volume
 region; 1.0 source-free data remain supported unchanged. Optional quantities
 `raw_temperature_gradient` (K/m), `raw_fourier_heat_flux` (W/m²),
 `recovered_nodal_heat_flux` (W/m²), `native_total_nodal_heat_rate` (W) and

@@ -1,7 +1,7 @@
-# Mission 2: cantilever with concentrated tip mass
+# Cantilever with concentrated tip mass
 
-The Mission 1 geometry, steel properties, fixed face and three C3D20R meshes are
-unchanged. A **1.17 kg** ideal point mass is located at (L,0,0), giving tip/beam
+The unloaded cantilever geometry, steel properties, fixed face and three C3D20R
+meshes are unchanged. A **1.17 kg** ideal point mass is located at (L,0,0), giving tip/beam
 mass ratio mu=1 and total model mass 2.34 kg. This is an explicit mathematical
 idealization: no size, eccentricity, rotational inertia or attachment compliance.
 It is not evidence that a finite industrial payload can neglect those effects.
@@ -80,7 +80,7 @@ sech(beta) + cos(beta)
 Its first six positive roots are independently bracketed on a pi/64 grid and
 bisected 60 times. The supported ratio is 0≤mu≤10; the scan must find exactly
 six roots. No FEM values are used to solve this scalar equation. For mu=0 the
-Mission 1 roots and input deck are recovered exactly. Root residuals and the
+unloaded cantilever roots and input deck are recovered exactly. Root residuals and the
 unscaled moment/shear boundary conditions are tested independently.
 
 For each plane f=beta²/(2*pi*L²)*sqrt(E*I/(rho*A)); the two families are sorted.
@@ -91,16 +91,16 @@ phi(xi) = cosh(beta*xi) - cos(beta*xi)
           - gamma*(sinh(beta*xi) - sin(beta*xi))
 ```
 
-The beta values differ from the unloaded-tip case; using Mission 1 frequencies
-or multiplying all modes by a common tip-mass correction factor is incorrect.
+The beta values differ from the unloaded-tip case; using unloaded cantilever
+frequencies or multiplying all modes by a common tip-mass correction factor is incorrect.
 The shape MAC excludes the auxiliary node to avoid a duplicated centerline tip
 sample. DAT/CSV still retain it for every mode and axis.
 
 ## Preserved quality gates and scaling
 
 Every mesh/mode uses the unchanged 1% analytical frequency, MAC≥0.99, direction
-fraction≥0.95, clamp≤1e-8 and final-mesh-change≤0.5% gates from Mission 1. The
-refinement trend check remains active. All six modes must also satisfy the
+fraction≥0.95, clamp≤1e-8 and final-mesh-change≤0.5% gates from the unloaded
+cantilever. The refinement trend check remains active. All six modes must also satisfy the
 three MPCs within **2e-6 of peak nodal displacement**, allowing signed sums of
 seven-significant-digit DAT values. This is not an attachment displacement budget.
 
@@ -149,13 +149,13 @@ metadata, displacement values and termination. A replay test deliberately update
 the hash manifest after corrupting FRD components and still must fail the semantic
 check. Hashes alone would miss this discrepancy. These checks establish cross-file
 consistency, not authenticity against replacement of an entire coordinated dataset.
-Archives from Mission 1 remain replayable with the additional semantic checks.
+Unloaded cantilever archives remain replayable with the additional semantic checks.
 
 ## Reproduction and scope
 
-No owner terminal steps are needed: the existing GitHub Actions workflow runs
-both cases, publishes both reports and retains complete evidence for 30 days.
-Independent contributors, without any AI, can use the same workflow or:
+The GitHub Actions workflow runs both cases, publishes both reports and retains
+complete evidence for 30 days.
+Contributors can use the same workflow or:
 
 ```sh
 python -m unittest discover -s tests -v
@@ -170,7 +170,7 @@ licensed; CalculiX remains GPL licensed. No new dependency or solver is introduc
 This is numerical verification of a specified linear, undamped beam plus ideal
 translational tip inertia. No experimental validation, finite payload rotary
 inertia, attachment dynamics, torsional/axial analytical verification, convergence
-order proof, industrial qualification or ANSYS equivalence is claimed.
+order proof or industrial qualification is claimed.
 
 Reference documentation: [CalculiX 2.21 manual](https://www.dhondt.de/ccx_2.21.pdf),
 sections 6.2.44 (`MASS`), 7.55 (`*EQUATION`) and 7.81 (`*MASS`). The equations and

@@ -3,8 +3,7 @@
 This benchmark extends the source-free patch test without changing it. Both
 adapters use `benchmarks/slab_volumetric_source.json`, the common `ProblemSpec`
 and `ThermalVerifier`. No analytical temperatures or fluxes are imposed inside
-the volume. The initial development results are not a substitute for the
-commit-specific Actions artifacts, which contain the actual measured values.
+the volume. Commit-specific Actions artifacts contain the actual measured values.
 
 ## Physical reference and sign conventions
 
@@ -155,12 +154,12 @@ CalculiX resolution is parsed from the actual native tokens; Elmer precision
 metadata records the pinned native VTU format at this benchmark's field scale.
 Different field scales/formats would need a renewed precision audit. Differentiation amplifies
 temperature half-ULP δ: componentwise gradient uncertainty ≤2δ/h_component,
-Fourier uncertainty ≤2kδ/h_component. Early CalculiX 8³ pointwise comparisons
-exceeded a naive fixed consistency threshold because DAT rounded DOFs while HFL
-was computed from internal values. The final check removes only this explicitly
-propagated printing bound before applying the original 2×10⁻⁶ consistency budget.
+Fourier uncertainty ≤2kδ/h_component. Comparing rounded CalculiX DAT DOFs with
+HFL computed from internal values can exceed an unpropagated fixed consistency
+threshold. The check removes only this explicitly propagated printing bound
+before applying the original 2×10⁻⁶ consistency budget.
 It does not weaken source-free gates or conceal discretization error. Small
-differences between cloud CalculiX 2.20 and CI 2.21, and between Elmer builds, may
+differences between CalculiX 2.20 and 2.21 runs, and between Elmer builds, may
 reflect assembly, recovery and printing; use artifact values for each exact run.
 
 Cross-solver comparison first replays both native archives and repeats independent
@@ -179,8 +178,8 @@ reversed flux, coordinate transforms, incomplete native output, fabricated yet
 balanced reactions, altered norms and rehashed archive tampering including CSV
 samples and plot data. Missing solvers fail tests rather than skipping them.
 
-The owner need only use GitHub on Android. Contributors can independently use
-the workflow or the following commands after its documented runtime setup:
+Contributors can use the workflow or the following commands after its
+documented runtime setup:
 
 ```sh
 python -m pip install '.[plots]'
@@ -191,10 +190,10 @@ python -m open_cae_evidence.source_comparison --calculix evidence/source-calculi
 python -m open_cae_evidence.source_comparison --calculix evidence/source-calculix --elmer evidence/source-elmer --output evidence/source-comparison --replay
 ```
 
-Native replay needs Python and pinned plot dependencies, but **no solver execution
-or AI**. Use `benchmark --verify-evidence` (with `--adapter elmer` for Elmer).
+Native replay needs Python and pinned plot dependencies, but **no solver execution**.
+Use `benchmark --verify-evidence` (with `--adapter elmer` for Elmer).
 `numerical_review` recomputes the nodal/center trap and inspects the converged
-wrong-source rejection before PR creation; CI repeats it and its replay.
+wrong-source rejection; CI runs it and its replay.
 All output directories must be new. Reports include machine-precision measured
 tables, semantic provenance, tolerances and deterministic log-log SVG plots.
 `analytical-reference.json` and per-mesh `nonnodal-samples.csv` supplement
@@ -207,7 +206,7 @@ quantities carry units/locations/provenance. The input source is audited metadat
 not a fabricated solver field. Archive index version 3 and legacy source-free
 and modal replay are retained. Downstream readers must inspect quantity source
 and recovery semantics rather than interpreting an integration-point sample
-location as native provenance. No MCP service is required or implemented.
+location as native provenance.
 
 ## Limits
 
@@ -219,4 +218,4 @@ Exported decimal DOFs limit very fine-mesh orders. CalculiX's separated reaction
 is a defensible residual reconstruction, not a claimed native separate reaction.
 Recovered flux is solver-specific. Energy conservation alone cannot establish
 correct physical inputs. No experimental validation, certification, industrial
-qualification or general ANSYS equivalence follows from this benchmark.
+qualification follows from this benchmark.

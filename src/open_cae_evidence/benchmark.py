@@ -1,4 +1,4 @@
-"""Compatible CLI and Mission 1/2 imports; orchestration now lives in runner."""
+"""Public CLI and legacy imports; orchestration lives in runner."""
 
 from .adapters.calculix import check_solver_log
 from .adapters.modal_dat import parse_dat

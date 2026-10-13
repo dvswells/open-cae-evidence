@@ -147,11 +147,11 @@ a dataset against coordinated wholesale malicious replacement.
 
 ## Reproduction and current scope
 
-From GitHub/ChatGPT Android, inspect **Independent Elmer thermal verification**
-in the automatic push/PR checks. workflow_dispatch becomes available after the
-workflow reaches the default branch with owner approval. No owner-operated machine is needed.
-The Actions artifact contains the build/runtime proof, 48 original tests, Elmer
-tests/failure cases, both modal archives, both thermal archives and comparison.
+Inspect **Independent Elmer thermal verification** in the automatic push/PR
+checks. Manual workflow dispatch is available when the workflow is present on
+the default branch.
+The Actions artifact contains the build/runtime proof, all 98 tests and failure
+cases, both modal archives, both solvers' thermal archives and comparisons.
 For independent contributors on an already provisioned open-source runtime:
 
 ```sh
@@ -163,13 +163,11 @@ python -m open_cae_evidence.comparison --calculix evidence/thermal --elmer evide
 python -m open_cae_evidence.comparison --calculix evidence/thermal --elmer evidence/elmer-thermal --output evidence/comparison --replay
 ```
 
-Replay needs Python and archived files, not the solver/compiler or AI inference.
+Replay needs Python and archived files, not the solver/compiler.
 The adapter is intentionally restricted to the current affine homogeneous steady
-slab. Modal Elmer, tetrahedra, curved meshes, sources, transients and nonlinear
-conductivity are unsupported. No general recovery-error bound, experimental
-validation, industrial qualification or ANSYS equivalence follows from this patch
-test. A nonconstant Poisson/source reference would materially strengthen testing
-and measure actual discretization/recovery error, but requires new physical
-source/energy-balance verification. It is deferred to Mission 5 to preserve the
-unchanged verifier and quality gates of this mission. No convergence order is
-claimed for the exactly representable linear slab.
+slab, with or without uniform volumetric generation. Modal Elmer, tetrahedra,
+curved meshes, transients and nonlinear conductivity are unsupported. No general
+recovery-error bound, experimental validation or industrial qualification follows
+from this patch test. No convergence order is claimed for the exactly
+representable linear slab. See [source-driven conduction](source-thermal.md) for
+measured discretization/recovery errors and source-aware energy balance.

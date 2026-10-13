@@ -64,7 +64,7 @@ specification rather than relaxed tolerances.
 The reference roots are recorded to double precision in `reference.py` and tested
 against cos(beta)+sech(beta)=0. Analytical free-tip conditions and the known 1.5
 plane frequency ratio are tested separately. The derivation above is sufficient
-to reproduce the reference without third-party data or an AI agent.
+to reproduce the reference without third-party data.
 
 The shape comparison uses unweighted centerline node samples:
 MAC = (u·v)² / ((u·u)(v·v)). It is invariant to sign/scale and is not a mass-weighted
@@ -85,9 +85,8 @@ identify the expected bending direction; they are not physical modal energies.
 
 These are acceptance criteria for this case, not certified uncertainty bounds.
 Three anisotropic refinement levels do not establish an asymptotic order or a
-Richardson-extrapolated exact solution. No hardware speed or accuracy comparison
-to ANSYS is made. No experiment, damping, geometric nonlinearity, prestress,
-contact, real fixture compliance or manufacturing variation is included.
+Richardson-extrapolated exact solution. No experiment, damping, geometric
+nonlinearity, prestress, contact, real fixture compliance or manufacturing variation is included.
 
 ## Negative checks and evidence replay
 
