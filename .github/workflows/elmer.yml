@@ -1,8 +1,19 @@
 name: Independent Elmer thermal verification
 on:
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      upload_evidence:
+        description: "Upload full reproducibility evidence (manual runs only)"
+        type: boolean
+        required: false
+        default: false
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -103,8 +114,8 @@ jobs:
               cat "evidence/$folder/report.md" >> "$GITHUB_STEP_SUMMARY"
             fi
           done
-      - name: Retain build and execution provenance
-        if: always()
+      - name: Package full build and execution provenance on request
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.upload_evidence }}
         run: |
           cp "$RUNNER_TEMP/elmer-build/"*.{txt,log} evidence/elmer-build/ 2>/dev/null || true
           if test -f "$RUNNER_TEMP/elmer/source-commit.txt"; then
@@ -117,8 +128,9 @@ jobs:
           root = Path('evidence')
           write_json(root / 'manifest.json', manifest(root))
           PY
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+      - name: Upload evidence on explicit manual request
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.upload_evidence }}
         with:
           name: elmer-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: evidence/
