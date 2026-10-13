@@ -36,16 +36,19 @@ GitHub Actions runs 98 tests, all benchmarks, cross-solver comparisons and archi
 evidence replay. Negative tests reject corrupted inputs, outputs and rehashed
 evidence, including numerically converged cases with incorrect physical inputs.
 
-Open a workflow run to read its technical reports and download the artifacts.
-They retain native solver inputs/outputs, logs, complete numerical fields, input
+Open a workflow run to read its technical reports and test logs. Full
+artifacts are not uploaded during normal CI runs. Repository maintainers can
+select **Run workflow** in GitHub Actions with `upload_evidence` enabled to
+retain the native solver inputs/outputs, logs, complete numerical fields, input
 audits, normalized results, analytical definitions, convergence tables/plots,
-failure evidence, build provenance and SHA-256 manifests. Artifacts are retained
-for 30 days. Replay re-extracts numerical fields and repeats physical checks;
+failure evidence, build provenance and SHA-256 manifests for 30 days.
+Independent users can reproduce these results from the source and pinned
+dependencies. Replay re-extracts numerical fields and repeats physical checks;
 hash integrity alone does not establish scientific correctness.
 
 ## Reproduction
 
-Both workflows run automatically on pushes and pull requests. For independent
+Both workflows run automatically on pull requests and pushes to `main`. For independent
 execution, use Ubuntu 24.04 and Python 3.12.14. Install CalculiX and follow the
 [pinned headless Elmer setup](docs/elmer.md) before running all test suites:
 
