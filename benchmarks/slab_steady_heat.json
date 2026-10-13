@@ -1,0 +1,11 @@
+{
+  "spec_version": "1.0",
+  "problem_id": "homogeneous_slab_steady_heat",
+  "analysis": "steady_heat_conduction",
+  "units": {"length": "m", "temperature": "K", "conductivity": "W/(m*K)", "heat_flux": "W/m^2", "heat_flow": "W"},
+  "geometry": {"length": 0.1, "width": 0.2, "height": 0.3},
+  "material": {"conductivity": 10.0},
+  "boundary": {"x_min_temperature": 400.0, "x_max_temperature": 300.0, "other_faces": "adiabatic"},
+  "internal_heat_generation": 0.0,
+  "meshes": [[2, 2, 2], [4, 4, 4], [8, 8, 8]]
+}

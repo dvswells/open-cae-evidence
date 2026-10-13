@@ -1,0 +1,92 @@
+name: Verified cantilever modal benchmark
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      upload_evidence:
+        description: "Upload full reproducibility evidence (manual runs only)"
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  modal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: src
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12.14"
+      - name: Install real CalculiX (signed Ubuntu packages)
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y calculix-ccx=2.21-1
+          python -m pip install --disable-pip-version-check .
+      - name: Record runtime dependencies
+        run: |
+          mkdir -p evidence
+          dpkg-query -W calculix-ccx libarpack2t64 libspooles2.2t64 libblas3 liblapack3 libgfortran5 > evidence/packages.txt
+          ldd /usr/bin/ccx > evidence/solver-libraries.txt
+          python -m pip freeze > evidence/python-packages.txt
+      - name: Physical input, negative and real-solver scaling tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m unittest discover -s tests -v 2>&1 | tee evidence/tests.log
+      - name: Run three meshes and verify six modes
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m open_cae_evidence.benchmark --output evidence/benchmark 2>&1 | tee evidence/benchmark.log
+      - name: Independently replay archived verification
+        run: python -m open_cae_evidence.benchmark --verify-evidence evidence/benchmark
+      - name: Run tip-mass benchmark on three meshes
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m open_cae_evidence.benchmark --config benchmarks/cantilever_tip_mass.json --output evidence/tip-mass 2>&1 | tee evidence/tip-mass.log
+      - name: Independently replay tip-mass DAT and FRD evidence
+        run: python -m open_cae_evidence.benchmark --verify-evidence evidence/tip-mass
+      - name: Run steady thermal slab on three meshes
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m open_cae_evidence.benchmark --config benchmarks/slab_steady_heat.json --output evidence/thermal 2>&1 | tee evidence/thermal.log
+      - name: Replay thermal raw and common-contract evidence
+        run: python -m open_cae_evidence.benchmark --verify-evidence evidence/thermal
+      - name: Publish technical report in run summary
+        if: always()
+        run: |
+          if test -f evidence/benchmark/report.md; then
+            cat evidence/benchmark/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if test -f evidence/tip-mass/report.md; then
+            cat evidence/tip-mass/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if test -f evidence/thermal/report.md; then
+            cat evidence/thermal/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload evidence on explicit manual request
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.upload_evidence }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cantilever-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30

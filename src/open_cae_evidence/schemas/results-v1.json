@@ -1,0 +1,617 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:open-cae-evidence:results:1.0.0",
+  "title": "Open CAE Evidence solver-independent results 1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_name",
+    "schema_version",
+    "problem",
+    "solver",
+    "runs",
+    "verification",
+    "unsupported_capabilities"
+  ],
+  "properties": {
+    "schema_name": {
+      "const": "open-cae-evidence.results"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "analysis",
+        "units",
+        "parameters",
+        "boundary_conditions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "analysis": {
+          "enum": [
+            "modal",
+            "steady_heat_conduction"
+          ]
+        },
+        "units": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "boundary_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "type",
+              "face",
+              "unit",
+              "value"
+            ]
+          }
+        }
+      }
+    },
+    "solver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "adapter_version",
+        "provenance"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "adapter_version": {
+          "type": "string"
+        },
+        "provenance": {
+          "type": "object",
+          "required": [
+            "python",
+            "platform",
+            "solver_path",
+            "solver_binary_sha256",
+            "git_revision",
+            "working_tree_dirty",
+            "threads"
+          ],
+          "properties": {
+            "python": {
+              "type": "string"
+            },
+            "platform": {
+              "type": "string"
+            },
+            "solver_path": {
+              "type": "string"
+            },
+            "solver_binary_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "git_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "working_tree_dirty": {
+              "type": "boolean"
+            },
+            "threads": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "runs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/run"
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "tolerances",
+        "mesh_study"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        },
+        "tolerances": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "value",
+              "unit"
+            ],
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": 0
+              },
+              "unit": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "mesh_study": {
+          "type": [
+            "object",
+            "array",
+            "null"
+          ]
+        }
+      }
+    },
+    "unsupported_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value"
+      ],
+      "properties": {
+        "node": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mode": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "element": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "point": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "face": {
+          "type": "string"
+        },
+        "coordinates": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number"
+          }
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "location",
+        "components",
+        "values",
+        "source"
+      ],
+      "properties": {
+        "unit": {
+          "type": "string"
+        },
+        "location": {
+          "enum": [
+            "node",
+            "node_mode",
+            "mode",
+            "integration_point",
+            "boundary"
+          ]
+        },
+        "components": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/record"
+          }
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "files",
+            "note"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "solver",
+                "postprocessed_from_solver"
+              ]
+            },
+            "files": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "location": {
+                "const": "node"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "items": {
+                  "required": [
+                    "node",
+                    "value"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "location": {
+                "const": "node_mode"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "items": {
+                  "required": [
+                    "node",
+                    "mode",
+                    "value"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "array"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "location": {
+                "const": "mode"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "items": {
+                  "required": [
+                    "mode",
+                    "value"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "location": {
+                "const": "integration_point"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "items": {
+                  "required": [
+                    "element",
+                    "point",
+                    "coordinates",
+                    "value"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "array"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "location": {
+                "const": "boundary"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "items": {
+                  "required": [
+                    "face",
+                    "value"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mesh",
+        "solver",
+        "quantities",
+        "verification",
+        "raw_output_verification",
+        "unsupported_capabilities"
+      ],
+      "properties": {
+        "mesh": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "coordinate_unit",
+            "counts",
+            "nodes",
+            "elements"
+          ],
+          "properties": {
+            "coordinate_unit": {
+              "const": "m"
+            },
+            "counts": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "nodes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "coordinates",
+                  "role"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "coordinates": {
+                    "type": "array",
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  "role": {
+                    "enum": [
+                      "solid",
+                      "point_mass"
+                    ]
+                  }
+                }
+              }
+            },
+            "elements": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "topology",
+                  "connectivity",
+                  "integration"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "topology": {
+                    "enum": [
+                      "hexahedron8",
+                      "hexahedron20",
+                      "point_mass"
+                    ]
+                  },
+                  "connectivity": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "integration": {
+                    "enum": [
+                      "full",
+                      "reduced",
+                      "not_applicable"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "solver": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version",
+            "adapter_version"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "adapter_version": {
+              "type": "string"
+            }
+          }
+        },
+        "quantities": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/quantity"
+          }
+        },
+        "verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "checks",
+            "metrics"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "passed",
+                "failed"
+              ]
+            },
+            "checks": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "metrics": {
+              "type": [
+                "object",
+                "array"
+              ]
+            }
+          }
+        },
+        "raw_output_verification": {
+          "type": "object",
+          "required": [
+            "passed"
+          ],
+          "properties": {
+            "passed": {
+              "type": "boolean"
+            }
+          }
+        },
+        "unsupported_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
