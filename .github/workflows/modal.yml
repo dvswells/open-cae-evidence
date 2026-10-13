@@ -2,8 +2,20 @@ name: Verified cantilever modal benchmark
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      upload_evidence:
+        description: "Upload full reproducibility evidence (manual runs only)"
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -70,8 +82,8 @@ jobs:
           if test -f evidence/thermal/report.md; then
             cat evidence/thermal/report.md >> "$GITHUB_STEP_SUMMARY"
           fi
-      - name: Preserve evidence even on failure
-        if: always()
+      - name: Upload evidence on explicit manual request
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.upload_evidence }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cantilever-evidence-${{ github.run_id }}-${{ github.run_attempt }}
